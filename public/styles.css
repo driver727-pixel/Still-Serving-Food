@@ -1,0 +1,372 @@
+/* ---- Reset & Base ---- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --accent: #f97316;
+  --radius: 12px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Accessibility ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Hero ---- */
+.hero {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid var(--surface-2);
+  padding: 3rem 1.5rem 2.5rem;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--accent);
+}
+
+.tagline {
+  margin-top: 0.75rem;
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  color: var(--muted);
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tagline strong {
+  color: var(--green);
+}
+
+/* ---- Main ---- */
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ---- Search ---- */
+.search-section {
+  margin-bottom: 2rem;
+}
+
+.search-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+#location-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#location-input:focus {
+  border-color: var(--accent);
+}
+
+#search-btn {
+  padding: 0.85rem 2rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+#search-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+#search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Results header ---- */
+.results-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.results-header h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.results-meta {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+/* ---- Filter bar ---- */
+.filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--surface-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.filter-btn.active,
+.filter-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ---- Venue cards ---- */
+.venue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.venue-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s;
+}
+
+.venue-card:hover {
+  border-color: var(--accent);
+}
+
+.venue-card.serving {
+  border-left: 4px solid var(--green);
+}
+
+.venue-card.not-serving {
+  border-left: 4px solid var(--red);
+}
+
+.venue-card.unknown {
+  border-left: 4px solid var(--amber);
+}
+
+.venue-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.venue-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.venue-name:hover {
+  color: var(--accent);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge.serving {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green);
+}
+
+.status-badge.not-serving {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red);
+}
+
+.status-badge.unknown {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--amber);
+}
+
+.venue-desc {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.venue-hours {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.venue-hours strong {
+  color: var(--text);
+}
+
+.venue-url {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.venue-url a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.venue-url a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Hour blocks table ---- */
+.hours-table {
+  margin-top: 0.75rem;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.hours-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0.2rem 0.5rem 0.2rem 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.hours-table td {
+  padding: 0.2rem 0.5rem 0.2rem 0;
+  color: var(--text);
+}
+
+.hours-detail summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  list-style: none;
+}
+
+.hours-detail summary::before {
+  content: '▸ ';
+}
+
+.hours-detail[open] summary::before {
+  content: '▾ ';
+}
+
+/* ---- Loading ---- */
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--muted);
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--surface-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Error ---- */
+.error-section {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  color: var(--red);
+}
+
+/* ---- Footer ---- */
+footer {
+  text-align: center;
+  padding: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-top: 1px solid var(--surface-2);
+}
+
+footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* ---- Utility ---- */
+.hidden {
+  display: none !important;
+}
