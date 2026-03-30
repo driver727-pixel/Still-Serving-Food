@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Still Serving Food 🍔</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <h1>🍔 Still Serving Food</h1>
+      <p class="tagline">
+        Find out which bars &amp; restaurants are <strong>serving food right now</strong> — grill
+        hours, kitchen hours, hot food hours.
+      </p>
+    </header>
+
+    <main>
+      <section class="search-section">
+        <form id="search-form" autocomplete="off">
+          <div class="search-row">
+            <label for="location-input" class="sr-only">Location</label>
+            <input
+              id="location-input"
+              type="text"
+              placeholder="Enter a city or neighbourhood, e.g. Brooklyn, NY"
+              required
+            />
+            <button type="submit" id="search-btn">Search</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="results-section" class="results-section hidden">
+        <div class="results-header">
+          <h2 id="results-title">Results</h2>
+          <span id="results-meta" class="results-meta"></span>
+        </div>
+
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="serving">🟢 Serving Now</button>
+          <button class="filter-btn" data-filter="not-serving">🔴 Not Serving</button>
+        </div>
+
+        <div id="venue-list" class="venue-list"></div>
+      </section>
+
+      <section id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Crawling food hours…</p>
+      </section>
+
+      <section id="error-section" class="error-section hidden">
+        <p id="error-message"></p>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Powered by
+        <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer">Firecrawl</a>
+        &mdash; hours info is scraped from venue websites and may not be 100% accurate.
+      </p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
