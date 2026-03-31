@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildVenue } = require('../src/scraper');
+const { buildVenue } = require('../functions/scraper');
 
 describe('buildVenue', () => {
   test('derives name from metadata title', () => {

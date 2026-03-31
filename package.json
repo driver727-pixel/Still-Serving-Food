@@ -2,9 +2,9 @@
   "name": "still-serving-food",
   "version": "1.0.0",
   "description": "The app crawls local restaurants for grill hours to inform the public of how late they serve food until, not open hours, not liquor hours, food hours only.",
-  "main": "src/server.js",
+  "main": "functions/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node functions/server.js",
     "test": "jest --testPathPatterns=tests/"
   },
   "repository": {
