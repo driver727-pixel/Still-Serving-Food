@@ -1,6 +1,6 @@
 'use strict';
 
-const { get, set, clear } = require('../src/venueStore');
+const { get, set, clear } = require('../functions/venueStore');
 
 describe('venueStore', () => {
   beforeEach(() => clear());

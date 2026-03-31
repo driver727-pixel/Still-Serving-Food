@@ -6,7 +6,7 @@ const {
   isCurrentlyServing,
   formatTime,
   expandDayRange,
-} = require('../src/hoursParser');
+} = require('../functions/hoursParser');
 
 // ---------------------------------------------------------------------------
 // parseTime

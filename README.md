@@ -90,7 +90,7 @@ npm start       # Start production server
 
 ```
 Still-Serving-Food/
-├── src/
+├── functions/
 │   ├── server.js        # Express server & API routes
 │   ├── scraper.js       # Firecrawl integration
 │   ├── hoursParser.js   # Parses food hours from scraped text
