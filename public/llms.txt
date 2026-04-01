@@ -16,7 +16,7 @@ Still Serving Food crawls local restaurant and bar websites in real time to extr
 
 ## How to use
 
-1. Go to https://still-serving-food.com/
+1. Go to https://letsnarf.com/
 2. Type a city or neighbourhood in the search box (e.g. "Brooklyn, NY" or "Manchester, UK")
 3. Click "Search"
 4. Browse venues and their current food-service status, kitchen closing times, and full weekly schedules
