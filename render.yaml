@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: still-serving-food-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: FIRECRAWL_API_KEY
+        sync: false
