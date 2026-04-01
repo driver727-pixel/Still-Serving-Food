@@ -370,3 +370,65 @@ footer a {
 .hidden {
   display: none !important;
 }
+
+/* ---- Noscript ---- */
+.noscript-notice {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  color: var(--amber);
+  font-size: 0.9rem;
+  padding: 0.85rem 1.25rem;
+  text-align: center;
+}
+
+/* ---- FAQ Section ---- */
+.faq-section {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 2rem;
+  padding: 2rem 1.5rem 0;
+  border-top: 1px solid var(--surface-2);
+}
+
+.faq-section h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.faq-item {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+}
+
+.faq-item summary {
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  list-style: none;
+  color: var(--text);
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary::before {
+  content: '▸ ';
+  color: var(--accent);
+}
+
+.faq-item[open] summary::before {
+  content: '▾ ';
+}
+
+.faq-item p {
+  padding: 0 1.25rem 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.6;
+}

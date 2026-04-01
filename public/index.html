@@ -3,10 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Still Serving Food 🍔</title>
+
+    <!-- Primary Meta Tags -->
+    <title>Still Serving Food 🍔 — Find Restaurants Still Serving Food Near You</title>
+    <meta name="title" content="Still Serving Food — Find Restaurants Still Serving Food Near You" />
+    <meta name="description" content="Find out which bars and restaurants near you are still serving food right now. Search by city or neighbourhood to see kitchen hours, grill hours, and hot food service times." />
+    <meta name="keywords" content="still serving food, kitchen hours, grill hours, food hours, late night food, restaurants serving food now, bar food hours, kitchen open, food service hours" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#f97316" />
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://still-serving-food.com/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://still-serving-food.com/" />
+    <meta property="og:site_name" content="Still Serving Food" />
+    <meta property="og:title" content="Still Serving Food — Find Restaurants Still Serving Food Near You" />
+    <meta property="og:description" content="Find out which bars and restaurants near you are still serving food right now. Search by city or neighbourhood to see kitchen hours, grill hours, and hot food service times." />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Still Serving Food — Find Restaurants Still Serving Food Near You" />
+    <meta name="twitter:description" content="Find out which bars and restaurants near you are still serving food right now. Search by city or neighbourhood to see kitchen hours, grill hours, and hot food service times." />
+
+    <!-- JSON-LD: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Still Serving Food",
+      "url": "https://still-serving-food.com/",
+      "description": "Find out which bars and restaurants near you are still serving food right now — kitchen hours, grill hours, hot food service times.",
+      "applicationCategory": "FoodService",
+      "operatingSystem": "All",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
+    <!-- JSON-LD: FAQPage (GEO — helps AI search engines surface direct answers) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Still Serving Food?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Still Serving Food is a free web app that crawls local restaurant and bar websites in real time to find their kitchen hours, grill hours, and hot food service times — so you know exactly which places near you are still serving food right now."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I find out which restaurants are still serving food near me?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Enter your city or neighbourhood (e.g. 'Brooklyn, NY' or 'Manchester, UK') in the search box and click Search. Still Serving Food instantly shows you which nearby bars and restaurants are currently serving food, along with their kitchen closing times."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Still Serving Food show kitchen closing times?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Still Serving Food shows the exact time the kitchen closes at each venue, so you can see how much time you have to order food. It focuses on food service hours — not general opening hours or bar hours."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How accurate is the food hours information?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Food hours are scraped in real time from each venue's own website. While we strive for accuracy, hours can change and may not reflect special closures or seasonal changes. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information."
+          }
+        }
+      ]
+    }
+    </script>
+
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <noscript>
+      <p class="noscript-notice">Still Serving Food requires JavaScript to search for food-serving venues near you. Please enable JavaScript in your browser.</p>
+    </noscript>
+
     <header class="hero">
       <h1>🍔 Still Serving Food</h1>
       <p class="tagline">
@@ -55,6 +142,30 @@
         <p id="error-message"></p>
       </section>
     </main>
+
+    <section class="faq-section" aria-labelledby="faq-heading">
+      <h2 id="faq-heading">Frequently Asked Questions</h2>
+
+      <details class="faq-item">
+        <summary>What is Still Serving Food?</summary>
+        <p>Still Serving Food is a free web app that crawls local restaurant and bar websites in real time to find their kitchen hours, grill hours, and hot food service times — so you know exactly which places near you are still serving food right now.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>How do I find out which restaurants are still serving food near me?</summary>
+        <p>Enter your city or neighbourhood (e.g. "Brooklyn, NY" or "Manchester, UK") in the search box and click Search. Still Serving Food instantly shows you which nearby bars and restaurants are currently serving food, along with their kitchen closing times.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Does Still Serving Food show kitchen closing times?</summary>
+        <p>Yes. Still Serving Food shows the exact time the kitchen closes at each venue, so you can see how much time you have to order food. It focuses on food service hours — not general opening hours or bar hours.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>How accurate is the food hours information?</summary>
+        <p>Food hours are scraped in real time from each venue's own website. While we strive for accuracy, hours can change and may not reflect special closures or seasonal changes. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information.</p>
+      </details>
+    </section>
 
     <footer>
       <p>
