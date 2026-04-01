@@ -26,6 +26,26 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Security / SEO headers
+// ---------------------------------------------------------------------------
+describe('Security and SEO HTTP headers', () => {
+  test('GET /api/health includes X-Content-Type-Options: nosniff', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  test('GET /api/health includes X-Frame-Options: SAMEORIGIN', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+  });
+
+  test('GET /api/health includes Referrer-Policy: strict-origin-when-cross-origin', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/health
 // ---------------------------------------------------------------------------
 describe('GET /api/health', () => {

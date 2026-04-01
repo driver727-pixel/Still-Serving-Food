@@ -1,0 +1,36 @@
+# Still Serving Food
+
+> A free web app that tells you which bars and restaurants near you are still serving food right now — kitchen hours, grill hours, hot food service times.
+
+## What it does
+
+Still Serving Food crawls local restaurant and bar websites in real time to extract their kitchen closing times and food service hours. Users enter a city or neighbourhood (e.g., "Brooklyn, NY") and instantly see which venues are currently serving food, which have stopped, and what time the kitchen closes.
+
+## Key facts
+
+- Real-time web scraping powered by Firecrawl
+- Shows kitchen hours, grill hours, and hot food service times (not just opening hours or liquor hours)
+- Filter results: currently serving, not serving, or all venues
+- Results are cached for 10 minutes for performance
+- Free to use — no account required
+
+## How to use
+
+1. Go to https://still-serving-food.com/
+2. Type a city or neighbourhood in the search box (e.g. "Brooklyn, NY" or "Manchester, UK")
+3. Click "Search"
+4. Browse venues and their current food-service status, kitchen closing times, and full weekly schedules
+
+## Frequently asked questions
+
+**What is Still Serving Food?**
+Still Serving Food is a free web app that crawls local restaurant and bar websites in real time to find their kitchen hours, grill hours, and hot food service times — so you know exactly which places near you are still serving food right now.
+
+**How do I find out which restaurants are still serving food near me?**
+Enter your city or neighbourhood (e.g. "Brooklyn, NY" or "Manchester, UK") in the search box and click Search. Still Serving Food instantly shows you which nearby bars and restaurants are currently serving food, along with their kitchen closing times.
+
+**Does Still Serving Food show kitchen closing times?**
+Yes. Still Serving Food shows the exact time the kitchen closes at each venue. It focuses on food service hours — not general opening hours or bar hours.
+
+**How accurate is the food hours information?**
+Food hours are scraped in real time from each venue's own website. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information.
