@@ -17,10 +17,52 @@ app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+  );
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
   next();
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+/**
+ * Return true only when url uses http/https and does not target a
+ * private, loopback, or link-local network address.
+ * @param {string} rawUrl
+ * @returns {boolean}
+ */
+function isPublicUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  const h = parsed.hostname.toLowerCase();
+  // Block loopback, private (RFC 1918), link-local, and unspecified addresses
+  if (
+    h === 'localhost' ||
+    h === '0.0.0.0' ||
+    h === '::1' ||
+    h === '[::1]' ||
+    /^127\./.test(h) ||
+    /^10\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
+    /^192\.168\./.test(h) ||
+    /^169\.254\./.test(h)
+  ) {
+    return false;
+  }
+
+  return true;
+}
 
 /**
  * GET /api/search?location=Brooklyn,NY&limit=10
@@ -31,8 +73,12 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/api/search', async (req, res) => {
   const { location, limit } = req.query;
 
-  if (!location || !location.trim()) {
+  if (!location || typeof location !== 'string' || !location.trim()) {
     return res.status(400).json({ error: 'location query parameter is required' });
+  }
+
+  if (location.length > 200) {
+    return res.status(400).json({ error: 'location is too long (max 200 characters)' });
   }
 
   const cached = venueStore.get(location);
@@ -61,8 +107,16 @@ app.get('/api/search', async (req, res) => {
 app.post('/api/scrape', async (req, res) => {
   const { url } = req.body;
 
-  if (!url || !url.trim()) {
+  if (!url || typeof url !== 'string' || !url.trim()) {
     return res.status(400).json({ error: 'url body field is required' });
+  }
+
+  if (url.length > 2048) {
+    return res.status(400).json({ error: 'url is too long (max 2048 characters)' });
+  }
+
+  if (!isPublicUrl(url)) {
+    return res.status(400).json({ error: 'url must use http or https and must not target a private or loopback address' });
   }
 
   try {
