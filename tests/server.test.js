@@ -43,6 +43,17 @@ describe('Security and SEO HTTP headers', () => {
     const res = await request(app).get('/api/health');
     expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
   });
+
+  test('GET /api/health includes Content-Security-Policy', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.headers['content-security-policy']).toMatch(/default-src 'self'/);
+    expect(res.headers['content-security-policy']).toMatch(/object-src 'none'/);
+  });
+
+  test('GET /api/health includes Permissions-Policy', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.headers['permissions-policy']).toMatch(/geolocation=\(\)/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -71,6 +82,13 @@ describe('GET /api/search', () => {
     const res = await request(app).get('/api/search?location=   ');
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/location/i);
+  });
+
+  test('returns 400 when location exceeds 200 characters', async () => {
+    const longLocation = 'a'.repeat(201);
+    const res = await request(app).get(`/api/search?location=${encodeURIComponent(longLocation)}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/too long/i);
   });
 
   test('returns venues from scraper on cache miss', async () => {
@@ -124,6 +142,31 @@ describe('POST /api/scrape', () => {
     const res = await request(app).post('/api/scrape').send({ url: '  ' });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/url/i);
+  });
+
+  test('returns 400 when url exceeds 2048 characters', async () => {
+    const longUrl = 'https://example.com/' + 'a'.repeat(2048);
+    const res = await request(app).post('/api/scrape').send({ url: longUrl });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/too long/i);
+  });
+
+  test('returns 400 when url targets localhost (SSRF protection)', async () => {
+    const res = await request(app).post('/api/scrape').send({ url: 'http://localhost/secret' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/private or loopback/i);
+  });
+
+  test('returns 400 when url targets a private IP (SSRF protection)', async () => {
+    const res = await request(app).post('/api/scrape').send({ url: 'http://192.168.1.1/admin' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/private or loopback/i);
+  });
+
+  test('returns 400 when url uses a non-http scheme (SSRF protection)', async () => {
+    const res = await request(app).post('/api/scrape').send({ url: 'file:///etc/passwd' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/http or https/i);
   });
 
   test('returns scraped venue on success', async () => {
