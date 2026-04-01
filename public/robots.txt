@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://still-serving-food.com/sitemap.xml
+Sitemap: https://letsnarf.com/sitemap.xml
