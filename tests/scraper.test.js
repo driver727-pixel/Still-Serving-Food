@@ -94,12 +94,12 @@ describe('searchVenues', () => {
 
     process.env.FIRECRAWL_API_KEY = 'fc-dummy';
     const origSearch = FirecrawlApp.prototype.search;
-    FirecrawlApp.prototype.search = jest.fn().mockResolvedValue({ data: null });
+    FirecrawlApp.prototype.search = jest.fn().mockResolvedValue({ web: null });
 
     const venues = await searchVenues('Test City');
     expect(venues).toEqual([]);
 
-    FirecrawlApp.prototype.search = origSearch;
+    delete FirecrawlApp.prototype.search;
   });
 });
 
@@ -121,13 +121,13 @@ describe('scrapeVenue', () => {
   test('wraps Firecrawl errors with a descriptive message', async () => {
     process.env.FIRECRAWL_API_KEY = 'fc-dummy';
     const FirecrawlApp = require('@mendable/firecrawl-js').default;
-    const origScrape = FirecrawlApp.prototype.scrapeUrl;
-    FirecrawlApp.prototype.scrapeUrl = jest.fn().mockRejectedValue(new Error('timeout'));
+    const origScrape = FirecrawlApp.prototype.scrape;
+    FirecrawlApp.prototype.scrape = jest.fn().mockRejectedValue(new Error('timeout'));
 
     await expect(scrapeVenue('https://example.com')).rejects.toThrow(
       /Firecrawl scrape failed for https:\/\/example\.com/,
     );
 
-    FirecrawlApp.prototype.scrapeUrl = origScrape;
+    delete FirecrawlApp.prototype.scrape;
   });
 });

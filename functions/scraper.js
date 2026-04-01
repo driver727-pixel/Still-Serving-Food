@@ -52,11 +52,11 @@ async function searchVenues(location, options = {}) {
     throw new Error(`Firecrawl search failed: ${err.message}`);
   }
 
-  if (!searchResults || !Array.isArray(searchResults.data)) {
+  if (!searchResults || !Array.isArray(searchResults.web)) {
     return [];
   }
 
-  const venues = searchResults.data.map((result) => buildVenue(result));
+  const venues = searchResults.web.map((result) => buildVenue(result));
   return venues;
 }
 
@@ -78,9 +78,8 @@ async function scrapeVenue(url, options = {}) {
 
   let result;
   try {
-    result = await client.scrapeUrl(url, {
+    result = await client.scrape(url, {
       formats: ['markdown'],
-      actions: [],
     });
   } catch (err) {
     throw new Error(`Firecrawl scrape failed for ${url}: ${err.message}`);
