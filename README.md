@@ -79,6 +79,20 @@ Then open <http://localhost:3000> in your browser.
 
 ---
 
+## Test Drive (GitHub Actions)
+
+Want to try the app without cloning it locally? Use the **Test Drive 🍔** workflow:
+
+1. Go to the **Actions** tab in this repository.
+2. Select **Test Drive 🍔** from the workflow list.
+3. Click **Run workflow**, fill in your city/neighbourhood (e.g. `Brooklyn, NY`) and an optional result limit, then click **Run workflow** again.
+
+The workflow will spin up the server, query for food-serving venues in your chosen location, and print a formatted summary — all inside the GitHub Actions runner. No local setup required.
+
+> **Note:** The `FIRECRAWL_API_KEY` repository secret must be set for the scraper to return live results.
+
+---
+
 ## Development
 
 ```bash
