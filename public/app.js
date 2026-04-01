@@ -74,7 +74,7 @@ function runAdCountdown() {
       adCountdown.textContent = 'Ad complete!';
       adContinueBtn.disabled = false;
       // Pre-fetch a token so it is ready when user clicks continue
-      fetch('/api/ad-token')
+      fetch('https://api.letsnarf.com/api/ad-token')
         .then((r) => r.json())
         .then((d) => {
           pendingAdToken = d.token || null;
@@ -137,7 +137,7 @@ async function doSearch(params, adToken) {
     if (params.servingUntil) qs.set('servingUntil', params.servingUntil);
     if (adToken) qs.set('adToken', adToken);
 
-    const res = await fetch(`/api/search?${qs.toString()}`);
+    const res = await fetch(`https://api.letsnarf.com/api/search?${qs.toString()}`);
 
     if (res.status === 402) {
       // Ad required — server says the free quota is exhausted for this IP
