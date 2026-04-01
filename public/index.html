@@ -102,19 +102,64 @@
       </p>
     </header>
 
+    <!-- Ad Modal Overlay -->
+    <div id="ad-modal" class="ad-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ad-modal-title">
+      <div class="ad-modal-box">
+        <h2 id="ad-modal-title">One more search? Watch a quick ad!</h2>
+        <p class="ad-modal-desc">Your first search is free. Watch a brief advertisement to unlock your next search result.</p>
+        <div class="ad-display" id="ad-display" aria-label="Advertisement">
+          <div class="ad-inner">
+            <div class="ad-logo">🍔</div>
+            <p class="ad-tagline"><strong>Still Serving Food</strong></p>
+            <p class="ad-body">The fastest way to find late-night kitchen hours near you.</p>
+            <p class="ad-cta">Discover which restaurants are still open!</p>
+          </div>
+          <div class="ad-progress-wrap">
+            <div id="ad-progress-bar" class="ad-progress-bar"></div>
+          </div>
+          <p id="ad-countdown" class="ad-countdown">Ad plays for <strong id="ad-seconds">5</strong>s…</p>
+        </div>
+        <button id="ad-continue-btn" class="ad-continue-btn" disabled>Continue to results</button>
+        <button id="ad-cancel-btn" class="ad-cancel-btn">Cancel</button>
+      </div>
+    </div>
+
     <main>
       <section class="search-section">
-        <form id="search-form" autocomplete="off">
-          <div class="search-row">
-            <label for="location-input" class="sr-only">Location</label>
-            <input
-              id="location-input"
-              type="text"
-              placeholder="Enter a city or neighbourhood, e.g. Brooklyn, NY"
-              required
-            />
+        <form id="search-form" autocomplete="off" novalidate>
+          <div class="search-fields">
+            <div class="search-field">
+              <label for="name-input">Restaurant name</label>
+              <input
+                id="name-input"
+                type="text"
+                placeholder="e.g. The Crown &amp; Anchor"
+                autocomplete="off"
+              />
+            </div>
+            <div class="search-field">
+              <label for="location-input">Location</label>
+              <input
+                id="location-input"
+                type="text"
+                placeholder="e.g. Brooklyn, NY or Manchester, UK"
+                autocomplete="off"
+              />
+            </div>
+            <div class="search-field">
+              <label for="serving-until-input">Serving until (optional)</label>
+              <input
+                id="serving-until-input"
+                type="text"
+                placeholder="e.g. 10pm or 22:00"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <div class="search-actions">
             <button type="submit" id="search-btn">Search</button>
           </div>
+          <p class="search-hint">First search is free. Additional searches require watching a brief ad.</p>
         </form>
       </section>
 
@@ -128,6 +173,10 @@
           <button class="filter-btn active" data-filter="all">All</button>
           <button class="filter-btn" data-filter="serving">🟢 Serving Now</button>
           <button class="filter-btn" data-filter="not-serving">🔴 Not Serving</button>
+        </div>
+        <div class="results-refine">
+          <label for="refine-name" class="refine-label">Filter by name:</label>
+          <input id="refine-name" type="text" class="refine-input" placeholder="Type to filter results…" />
         </div>
 
         <div id="venue-list" class="venue-list"></div>

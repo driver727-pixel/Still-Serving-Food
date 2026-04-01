@@ -187,6 +187,8 @@ describe('Server API end-to-end', () => {
 
   beforeEach(() => {
     venueStore.clear();
+    app._searchCounters.clear();
+    app._adTokens.clear();
     jest.clearAllMocks();
   });
 

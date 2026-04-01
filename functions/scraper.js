@@ -22,16 +22,50 @@ function buildClient(apiKey) {
 }
 
 /**
- * Use Firecrawl's /search endpoint to find restaurant & bar pages for a
- * given location query, then scrape each result for food-service hours.
+ * Build a search query string from the given search parameters.
+ * @param {object} params
+ * @param {string} [params.location]
+ * @param {string} [params.name]
+ * @param {string} [params.servingUntil]
+ * @returns {string}
+ */
+function buildQuery(params = {}) {
+  const parts = ['bars restaurants grill food hours'];
+
+  if (params.name && params.name.trim()) {
+    parts.push(`"${params.name.trim()}"`);
+  }
+
+  if (params.location && params.location.trim()) {
+    parts.push(`"${params.location.trim()}"`);
+  }
+
+  if (params.servingUntil && params.servingUntil.trim()) {
+    parts.push(`serving until ${params.servingUntil.trim()}`);
+  }
+
+  return parts.join(' ');
+}
+
+/**
+ * Use Firecrawl's /search endpoint to find restaurant & bar pages matching
+ * the given search parameters, then scrape each result for food-service hours.
  *
- * @param {string} location - E.g. "Brooklyn, NY" or "Manchester, UK"
+ * @param {object} searchParams
+ * @param {string} [searchParams.location] - E.g. "Brooklyn, NY"
+ * @param {string} [searchParams.name]     - E.g. "The Crown & Anchor"
+ * @param {string} [searchParams.servingUntil] - E.g. "10pm"
  * @param {object} [options]
  * @param {string} [options.apiKey] - Overrides process.env.FIRECRAWL_API_KEY
  * @param {number} [options.limit=10] - Max number of venues to process
  * @returns {Promise<Venue[]>}
  */
-async function searchVenues(location, options = {}) {
+async function searchVenues(searchParams, options = {}) {
+  // Back-compat: allow passing a plain location string
+  if (typeof searchParams === 'string') {
+    searchParams = { location: searchParams };
+  }
+
   const apiKey = options.apiKey || process.env.FIRECRAWL_API_KEY;
   if (!apiKey) {
     throw new Error('FIRECRAWL_API_KEY is not set. Add it to your .env file.');
@@ -40,7 +74,7 @@ async function searchVenues(location, options = {}) {
   const limit = options.limit || 10;
   const client = buildClient(apiKey);
 
-  const query = `bars restaurants grill food hours "${location}"`;
+  const query = buildQuery(searchParams);
 
   let searchResults;
   try {
