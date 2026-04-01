@@ -1,0 +1,113 @@
+name: "Test Drive 🍔"
+
+on:
+  workflow_dispatch:
+    inputs:
+      location:
+        description: "City or neighborhood to search (e.g. Brooklyn NY)"
+        required: true
+        default: "Brooklyn, NY"
+      limit:
+        description: "Maximum number of venues to return (1–12)"
+        required: false
+        default: "5"
+
+jobs:
+  demo:
+    name: Search for food-serving venues
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start server
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          PORT: 3000
+        run: |
+          node functions/server.js &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+
+      - name: Wait for server to be ready
+        run: |
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then
+              echo "Server is ready."
+              exit 0
+            fi
+            echo "Waiting for server… ($i/15)"
+            sleep 1
+          done
+          echo "Server did not start in time." >&2
+          exit 1
+
+      - name: Search for venues
+        id: search
+        env:
+          LOCATION: ${{ inputs.location }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          echo "Searching for venues serving food in: $LOCATION"
+          ENCODED_LOCATION=$(printf '%s' "$LOCATION" | jq -Rr @uri)
+          RESPONSE=$(curl -sf \
+            "http://localhost:3000/api/search?location=${ENCODED_LOCATION}&limit=$LIMIT")
+          echo "$RESPONSE" | python3 -m json.tool
+          echo "response<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$RESPONSE" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Print summary
+        env:
+          RESPONSE: ${{ steps.search.outputs.response }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os
+
+          data = json.loads(os.environ["RESPONSE"])
+          venues = data.get("venues", [])
+          from_cache = data.get("fromCache", False)
+
+          print(f"\n{'='*60}")
+          print(f"  Still Serving Food — Results")
+          print(f"{'='*60}")
+          print(f"  Venues found : {len(venues)}")
+          print(f"  From cache   : {from_cache}")
+          print(f"{'='*60}\n")
+
+          serving = [v for v in venues if v.get("serving")]
+          not_serving = [v for v in venues if not v.get("serving")]
+
+          if serving:
+              print("🟢  SERVING FOOD NOW:")
+              for v in serving:
+                  closes = v.get("closesAt") or "unknown close time"
+                  print(f"    • {v['name']}  (closes {closes})")
+                  print(f"      {v.get('url', '')}")
+          else:
+              print("🔴  No venues are serving food right now.")
+
+          if not_serving:
+              print("\n⏸   NOT CURRENTLY SERVING:")
+              for v in not_serving:
+                  opens = v.get("opensAt") or "unknown open time"
+                  print(f"    • {v['name']}  (opens {opens})")
+                  print(f"      {v.get('url', '')}")
+
+          print()
+          PYEOF
+
+      - name: Stop server
+        if: always()
+        run: kill "$SERVER_PID" 2>/dev/null || true
