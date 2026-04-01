@@ -102,6 +102,24 @@ describe('parseHours', () => {
     // 5 weekdays + Sat + Sun = 7
     expect(blocks.length).toBe(7);
   });
+
+  test('parses weekdays keyword', () => {
+    const blocks = parseHours('Food hours: Weekdays 11am-9pm');
+    expect(blocks.length).toBe(5); // Mon–Fri
+    expect(blocks.map((b) => b.day)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  test('parses weekends keyword', () => {
+    const blocks = parseHours('Kitchen: Weekends 10am-8pm');
+    expect(blocks.length).toBe(2); // Sun + Sat
+    expect(blocks.map((b) => b.day).sort()).toEqual([0, 6]);
+  });
+
+  test('parses comma-separated days', () => {
+    const blocks = parseHours('Grill: Mon, Wed, Fri 12pm-9pm');
+    expect(blocks.length).toBe(3);
+    expect(blocks.map((b) => b.day)).toEqual([1, 3, 5]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -149,6 +167,23 @@ describe('isCurrentlyServing', () => {
     const fridayNight = makeDate(5, 23); // Friday 11pm
     const result = isCurrentlyServing(lateBlocks, fridayNight);
     expect(result.serving).toBe(true);
+  });
+
+  test('wrap-around midnight: still serving early next morning', () => {
+    // Friday block closes at 2am — should still be active at Saturday 1am
+    const lateBlocks = [{ day: 5, open: 18 * 60, close: 2 * 60, label: 'friday', inFoodSection: true }];
+    const satEarlyMorning = makeDate(6, 1); // Saturday 1am
+    const result = isCurrentlyServing(lateBlocks, satEarlyMorning);
+    expect(result.serving).toBe(true);
+    expect(result.closesAt).toBe(2 * 60);
+  });
+
+  test('wrap-around midnight: not serving after close on next morning', () => {
+    // Friday block closes at 2am — should not be active at Saturday 3am
+    const lateBlocks = [{ day: 5, open: 18 * 60, close: 2 * 60, label: 'friday', inFoodSection: true }];
+    const satMorning = makeDate(6, 3); // Saturday 3am
+    const result = isCurrentlyServing(lateBlocks, satMorning);
+    expect(result.serving).toBe(false);
   });
 });
 

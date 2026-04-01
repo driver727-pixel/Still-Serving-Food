@@ -179,16 +179,25 @@ function isCurrentlyServing(hourBlocks, now = new Date()) {
 
   // Prefer food-section blocks; fall back to general blocks if none found
   const foodBlocks = hourBlocks.filter((b) => b.inFoodSection);
-  const todayBlocks = (foodBlocks.length ? foodBlocks : hourBlocks).filter(
-    (b) => b.day === dayOfWeek,
+  const blocks = foodBlocks.length ? foodBlocks : hourBlocks;
+
+  const todayBlocks = blocks.filter((b) => b.day === dayOfWeek);
+
+  // Include previous day's wrap-past-midnight blocks so that e.g. a Friday
+  // block open until 2am is still considered active on Saturday at 1am.
+  const prevDay = (dayOfWeek + 6) % 7;
+  const prevDayWrapBlocks = blocks.filter(
+    (b) => b.day === prevDay && b.close <= b.open,
   );
 
-  if (!todayBlocks.length) {
+  const relevantBlocks = [...todayBlocks, ...prevDayWrapBlocks];
+
+  if (!relevantBlocks.length) {
     return { serving: false, opensAt: null, closesAt: null };
   }
 
-  for (const block of todayBlocks) {
-    let { open, close } = block;
+  for (const block of relevantBlocks) {
+    const { open, close } = block;
     // Closing times past midnight (e.g. 1am = 60 min) but stored as < open
     // are common in bar contexts — treat them as next-day.
     const wrapsNextDay = close <= open;
@@ -202,7 +211,7 @@ function isCurrentlyServing(hourBlocks, now = new Date()) {
     }
   }
 
-  // Not currently serving — find next open time
+  // Not currently serving — find next open time (today's blocks only)
   const upcoming = todayBlocks.filter((b) => b.open > minutesSinceMidnight);
   const opensAt = upcoming.length ? Math.min(...upcoming.map((b) => b.open)) : null;
 

@@ -100,8 +100,10 @@ Still-Serving-Food/
 │   ├── styles.css       # Dark-theme stylesheet
 │   └── app.js           # Client-side JavaScript
 ├── tests/
+│   ├── e2e.test.js
 │   ├── hoursParser.test.js
 │   ├── scraper.test.js
+│   ├── server.test.js
 │   └── venueStore.test.js
 ├── .env.example
 └── package.json
