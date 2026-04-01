@@ -85,15 +85,28 @@ main {
   margin-bottom: 2rem;
 }
 
-.search-row {
-  display: flex;
+.search-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.75rem;
-  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
 }
 
-#location-input {
-  flex: 1;
-  min-width: 200px;
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.search-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.search-field input {
   padding: 0.85rem 1.25rem;
   background: var(--surface);
   border: 1px solid var(--surface-2);
@@ -104,8 +117,19 @@ main {
   transition: border-color 0.2s;
 }
 
+.search-field input:focus {
+  border-color: var(--accent);
+}
+
+/* Legacy single input kept for back-compat selectors */
 #location-input:focus {
   border-color: var(--accent);
+}
+
+.search-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.75rem;
 }
 
 #search-btn {
@@ -128,6 +152,183 @@ main {
 #search-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.search-hint {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---- Results refine bar ---- */
+.results-refine {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.refine-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.refine-input {
+  flex: 1;
+  min-width: 160px;
+  max-width: 320px;
+  padding: 0.45rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.refine-input:focus {
+  border-color: var(--accent);
+}
+
+/* ---- Ad Modal ---- */
+.ad-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.ad-modal.hidden {
+  display: none !important;
+}
+
+.ad-modal-box {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  padding: 2rem;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: center;
+}
+
+.ad-modal-box h2 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.ad-modal-desc {
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.ad-display {
+  background: linear-gradient(135deg, #1a2a3a 0%, #0f1e2d 100%);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.ad-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ad-logo {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.ad-tagline {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.ad-body {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ad-cta {
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ad-progress-wrap {
+  margin-top: 1rem;
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ad-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.1s linear;
+  width: 0%;
+}
+
+.ad-countdown {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.ad-continue-btn {
+  padding: 0.85rem 2rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.ad-continue-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ad-continue-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.ad-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 0.875rem;
+  padding: 0.6rem 1.25rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ad-cancel-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
 }
 
 /* ---- Results header ---- */

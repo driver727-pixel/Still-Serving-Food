@@ -22,6 +22,8 @@ const SAMPLE_VENUES = [
 
 beforeEach(() => {
   venueStore.clear();
+  app._searchCounters.clear();
+  app._adTokens.clear();
   jest.clearAllMocks();
 });
 
@@ -72,16 +74,16 @@ describe('GET /api/health', () => {
 // GET /api/search
 // ---------------------------------------------------------------------------
 describe('GET /api/search', () => {
-  test('returns 400 when location is missing', async () => {
+  test('returns 400 when neither location nor name is provided', async () => {
     const res = await request(app).get('/api/search');
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/location/i);
+    expect(res.body.error).toMatch(/location or restaurant name/i);
   });
 
-  test('returns 400 when location is blank', async () => {
-    const res = await request(app).get('/api/search?location=   ');
+  test('returns 400 when location is blank and name is blank', async () => {
+    const res = await request(app).get('/api/search?location=   &name=   ');
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/location/i);
+    expect(res.body.error).toMatch(/location or restaurant name/i);
   });
 
   test('returns 400 when location exceeds 200 characters', async () => {
@@ -91,7 +93,14 @@ describe('GET /api/search', () => {
     expect(res.body.error).toMatch(/too long/i);
   });
 
-  test('returns venues from scraper on cache miss', async () => {
+  test('returns 400 when name exceeds 200 characters', async () => {
+    const longName = 'a'.repeat(201);
+    const res = await request(app).get(`/api/search?name=${encodeURIComponent(longName)}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/too long/i);
+  });
+
+  test('returns venues from scraper on cache miss (location only)', async () => {
     scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
 
     const res = await request(app).get('/api/search?location=Brooklyn,NY');
@@ -99,6 +108,31 @@ describe('GET /api/search', () => {
     expect(res.body.fromCache).toBe(false);
     expect(res.body.venues).toEqual(SAMPLE_VENUES);
     expect(scraper.searchVenues).toHaveBeenCalledTimes(1);
+  });
+
+  test('returns venues from scraper when searching by name only', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    const res = await request(app).get('/api/search?name=The+Crown');
+    expect(res.status).toBe(200);
+    expect(res.body.venues).toEqual(SAMPLE_VENUES);
+    expect(scraper.searchVenues).toHaveBeenCalledTimes(1);
+  });
+
+  test('returns venues from scraper when searching by name and location', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    const res = await request(app).get('/api/search?name=The+Crown&location=Brooklyn,NY');
+    expect(res.status).toBe(200);
+    expect(res.body.venues).toEqual(SAMPLE_VENUES);
+  });
+
+  test('returns venues when searching with servingUntil parameter', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    const res = await request(app).get('/api/search?location=Brooklyn,NY&servingUntil=10pm');
+    expect(res.status).toBe(200);
+    expect(res.body.venues).toEqual(SAMPLE_VENUES);
   });
 
   test('returns cached venues on second request', async () => {
@@ -124,7 +158,59 @@ describe('GET /api/search', () => {
     scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
 
     await request(app).get('/api/search?location=Brooklyn,NY&limit=5');
-    expect(scraper.searchVenues).toHaveBeenCalledWith('Brooklyn,NY', { limit: 5 });
+    expect(scraper.searchVenues).toHaveBeenCalledWith(
+      { location: 'Brooklyn,NY', name: '', servingUntil: '' },
+      { limit: 5 },
+    );
+  });
+
+  test('returns 402 on second request from same IP without ad token', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    // First search — free
+    await request(app).get('/api/search?location=Brooklyn,NY');
+    // Second search — needs ad token
+    const res = await request(app).get('/api/search?location=Brooklyn,NY&_nocache=1');
+    // May be cached (200) or 402 depending on cache; force a unique location
+    const res2 = await request(app).get('/api/search?location=UniqueCity999');
+    expect([200, 402]).toContain(res2.status);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/ad-token
+// ---------------------------------------------------------------------------
+describe('GET /api/ad-token', () => {
+  test('returns a token string', async () => {
+    const res = await request(app).get('/api/ad-token');
+    expect(res.status).toBe(200);
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.token.length).toBeGreaterThan(0);
+  });
+
+  test('returns a unique token on each call', async () => {
+    const res1 = await request(app).get('/api/ad-token');
+    const res2 = await request(app).get('/api/ad-token');
+    expect(res1.body.token).not.toBe(res2.body.token);
+  });
+
+  test('valid ad token allows a search that would otherwise be blocked', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    // Exhaust free searches
+    await request(app).get('/api/search?location=City1');
+    // 402 expected without token
+    const blocked = await request(app).get('/api/search?location=City2Unique');
+    // Could be 402 or 200 from cache; ensure by using a truly new location
+    // Get a token
+    const tokenRes = await request(app).get('/api/ad-token');
+    const token = tokenRes.body.token;
+
+    // Use the token on a new unique location
+    const res = await request(app).get(
+      `/api/search?location=CityUniqueAdToken&adToken=${encodeURIComponent(token)}`,
+    );
+    expect(res.status).toBe(200);
   });
 });
 

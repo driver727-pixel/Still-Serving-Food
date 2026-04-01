@@ -2,7 +2,9 @@
 
 /* ---- DOM refs ---- */
 const form = document.getElementById('search-form');
+const nameInput = document.getElementById('name-input');
 const locationInput = document.getElementById('location-input');
+const servingUntilInput = document.getElementById('serving-until-input');
 const searchBtn = document.getElementById('search-btn');
 const resultsSection = document.getElementById('results-section');
 const resultsTitle = document.getElementById('results-title');
@@ -12,34 +14,156 @@ const loading = document.getElementById('loading');
 const errorSection = document.getElementById('error-section');
 const errorMessage = document.getElementById('error-message');
 const filterBtns = document.querySelectorAll('.filter-btn');
+const refineNameInput = document.getElementById('refine-name');
 
+/* ---- Ad modal refs ---- */
+const adModal = document.getElementById('ad-modal');
+const adContinueBtn = document.getElementById('ad-continue-btn');
+const adCancelBtn = document.getElementById('ad-cancel-btn');
+const adProgressBar = document.getElementById('ad-progress-bar');
+const adCountdown = document.getElementById('ad-countdown');
+const adSeconds = document.getElementById('ad-seconds');
+
+/* ---- State ---- */
 let allVenues = [];
 let currentFilter = 'all';
+
+const AD_DURATION_MS = 5000;
+const STORAGE_KEY = 'ssf_free_search_used';
+
+function hasFreeSearchAvailable() {
+  return !sessionStorage.getItem(STORAGE_KEY);
+}
+
+function markFreeSearchUsed() {
+  sessionStorage.setItem(STORAGE_KEY, '1');
+}
+
+/* ---- Ad token ---- */
+let pendingAdToken = null;
+let pendingSearchParams = null;
+
+function showAdModal(searchParams) {
+  pendingSearchParams = searchParams;
+  pendingAdToken = null;
+  adContinueBtn.disabled = true;
+  adProgressBar.style.width = '0%';
+  adSeconds.textContent = Math.ceil(AD_DURATION_MS / 1000);
+  adModal.classList.remove('hidden');
+  adModal.setAttribute('aria-hidden', 'false');
+  runAdCountdown();
+}
+
+function hideAdModal() {
+  adModal.classList.add('hidden');
+  adModal.setAttribute('aria-hidden', 'true');
+}
+
+function runAdCountdown() {
+  const start = Date.now();
+  const tick = () => {
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, AD_DURATION_MS - elapsed);
+    const progress = Math.min(100, (elapsed / AD_DURATION_MS) * 100);
+    adProgressBar.style.width = `${progress}%`;
+    adSeconds.textContent = Math.ceil(remaining / 1000);
+
+    if (remaining > 0) {
+      requestAnimationFrame(tick);
+    } else {
+      adCountdown.textContent = 'Ad complete!';
+      adContinueBtn.disabled = false;
+      // Pre-fetch a token so it is ready when user clicks continue
+      fetch('/api/ad-token')
+        .then((r) => r.json())
+        .then((d) => {
+          pendingAdToken = d.token || null;
+        })
+        .catch(() => {
+          pendingAdToken = null;
+        });
+    }
+  };
+  requestAnimationFrame(tick);
+}
+
+adContinueBtn.addEventListener('click', async () => {
+  hideAdModal();
+  if (pendingSearchParams) {
+    await doSearch(pendingSearchParams, pendingAdToken);
+  }
+});
+
+adCancelBtn.addEventListener('click', () => {
+  hideAdModal();
+  pendingSearchParams = null;
+});
 
 /* ---- Search form ---- */
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const location = locationInput.value.trim();
-  if (!location) return;
-  await doSearch(location);
+  const params = getSearchParams();
+  if (!params.name && !params.location) {
+    showError('Please enter a restaurant name or location to search.');
+    return;
+  }
+  hideError();
+
+  if (hasFreeSearchAvailable()) {
+    markFreeSearchUsed();
+    await doSearch(params, null);
+  } else {
+    showAdModal(params);
+  }
 });
 
-async function doSearch(location) {
+function getSearchParams() {
+  return {
+    name: nameInput.value.trim(),
+    location: locationInput.value.trim(),
+    servingUntil: servingUntilInput.value.trim(),
+  };
+}
+
+async function doSearch(params, adToken) {
   showLoading(true);
   hideError();
   hideResults();
 
   try {
-    const res = await fetch(`/api/search?location=${encodeURIComponent(location)}&limit=12`);
+    const qs = new URLSearchParams({ limit: '12' });
+    if (params.name) qs.set('name', params.name);
+    if (params.location) qs.set('location', params.location);
+    if (params.servingUntil) qs.set('servingUntil', params.servingUntil);
+    if (adToken) qs.set('adToken', adToken);
+
+    const res = await fetch(`/api/search?${qs.toString()}`);
+
+    if (res.status === 402) {
+      // Ad required — server says the free quota is exhausted for this IP
+      // (e.g. token was stale); prompt user to watch another ad
+      markFreeSearchUsed();
+      showAdModal(params);
+      return;
+    }
+
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `Server error ${res.status}`);
+      throw new Error(body.error || body.message || `Server error ${res.status}`);
     }
+
     const data = await res.json();
     allVenues = data.venues || [];
 
-    resultsTitle.textContent = `Food hours near "${location}"`;
+    const titleParts = [];
+    if (params.name) titleParts.push(`"${params.name}"`);
+    if (params.location) titleParts.push(`near "${params.location}"`);
+    if (params.servingUntil) titleParts.push(`serving until ${params.servingUntil}`);
+    resultsTitle.textContent = `Results${titleParts.length ? ': ' + titleParts.join(' ') : ''}`;
     resultsMeta.textContent = `${allVenues.length} venue${allVenues.length !== 1 ? 's' : ''} found${data.fromCache ? ' (cached)' : ''}`;
+
+    // Clear refine filter on new search
+    if (refineNameInput) refineNameInput.value = '';
 
     applyFilter(currentFilter);
     showResults(true);
@@ -60,10 +184,23 @@ filterBtns.forEach((btn) => {
   });
 });
 
+/* ---- Refine by name (client-side) ---- */
+if (refineNameInput) {
+  refineNameInput.addEventListener('input', () => {
+    applyFilter(currentFilter);
+  });
+}
+
 function applyFilter(filter) {
   let venues = allVenues;
-  if (filter === 'serving') venues = allVenues.filter((v) => v.serving === true);
-  if (filter === 'not-serving') venues = allVenues.filter((v) => v.serving === false);
+  if (filter === 'serving') venues = venues.filter((v) => v.serving === true);
+  if (filter === 'not-serving') venues = venues.filter((v) => v.serving === false);
+
+  const refineTerm = refineNameInput ? refineNameInput.value.trim().toLowerCase() : '';
+  if (refineTerm) {
+    venues = venues.filter((v) => v.name && v.name.toLowerCase().includes(refineTerm));
+  }
+
   renderVenues(venues);
 }
 

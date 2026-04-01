@@ -76,24 +76,56 @@ describe('searchVenues', () => {
     process.env.FIRECRAWL_API_KEY = ORIG_ENV;
   });
 
-  test('throws when FIRECRAWL_API_KEY is not set', async () => {
+  test('throws when FIRECRAWL_API_KEY is not set (string form)', async () => {
     delete process.env.FIRECRAWL_API_KEY;
     await expect(searchVenues('Brooklyn, NY')).rejects.toThrow('FIRECRAWL_API_KEY is not set');
   });
 
+  test('throws when FIRECRAWL_API_KEY is not set (object form)', async () => {
+    delete process.env.FIRECRAWL_API_KEY;
+    await expect(searchVenues({ location: 'Brooklyn, NY' })).rejects.toThrow('FIRECRAWL_API_KEY is not set');
+  });
+
   test('accepts apiKey passed via options (overrides env)', async () => {
-    // Pass a dummy key; the call will fail at the network level, not at key-check
     delete process.env.FIRECRAWL_API_KEY;
     await expect(
       searchVenues('Brooklyn, NY', { apiKey: 'fc-dummy' }),
     ).rejects.toThrow(/Firecrawl search failed/);
   });
 
+  test('accepts name param and builds correct query', async () => {
+    const FirecrawlApp = require('@mendable/firecrawl-js').default;
+    process.env.FIRECRAWL_API_KEY = 'fc-dummy';
+
+    const mockSearch = jest.fn().mockResolvedValue({ web: [] });
+    FirecrawlApp.prototype.search = mockSearch;
+
+    await searchVenues({ name: 'The Crown', location: 'Brooklyn, NY' });
+    const calledQuery = mockSearch.mock.calls[0][0];
+    expect(calledQuery).toContain('"The Crown"');
+    expect(calledQuery).toContain('"Brooklyn, NY"');
+
+    delete FirecrawlApp.prototype.search;
+  });
+
+  test('accepts servingUntil param and includes it in query', async () => {
+    const FirecrawlApp = require('@mendable/firecrawl-js').default;
+    process.env.FIRECRAWL_API_KEY = 'fc-dummy';
+
+    const mockSearch = jest.fn().mockResolvedValue({ web: [] });
+    FirecrawlApp.prototype.search = mockSearch;
+
+    await searchVenues({ location: 'Brooklyn, NY', servingUntil: '10pm' });
+    const calledQuery = mockSearch.mock.calls[0][0];
+    expect(calledQuery).toContain('serving until 10pm');
+
+    delete FirecrawlApp.prototype.search;
+  });
+
   test('returns empty array when Firecrawl returns no data array', async () => {
     const FirecrawlApp = require('@mendable/firecrawl-js').default;
 
     process.env.FIRECRAWL_API_KEY = 'fc-dummy';
-    const origSearch = FirecrawlApp.prototype.search;
     FirecrawlApp.prototype.search = jest.fn().mockResolvedValue({ web: null });
 
     const venues = await searchVenues('Test City');
