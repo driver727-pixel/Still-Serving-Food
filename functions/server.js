@@ -12,6 +12,23 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// CORS — allow the static frontend hosted on letsnarf.com to call the API
+const ALLOWED_ORIGINS = new Set(['https://letsnarf.com', 'https://www.letsnarf.com']);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 // Security & SEO-friendly HTTP headers
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
