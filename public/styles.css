@@ -633,3 +633,18 @@ footer a {
   color: var(--muted);
   line-height: 1.6;
 }
+
+/* ---- Search Ads ---- */
+.search-ad {
+  margin: 1.25rem 0;
+  text-align: center;
+  min-height: 90px; /* reserve space so layout doesn't shift once ad loads */
+}
+
+.search-ad-label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.25rem;
+}
