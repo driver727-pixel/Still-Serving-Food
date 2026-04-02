@@ -13,7 +13,17 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // CORS — allow the static frontend hosted on letsnarf.com to call the API
-const ALLOWED_ORIGINS = new Set(['https://letsnarf.com', 'https://www.letsnarf.com']);
+const ALLOWED_ORIGINS = new Set([
+  'https://letsnarf.com',
+  'https://www.letsnarf.com',
+  // Capacitor native shell origins.
+  // Android WebViews use capacitor://localhost; some builds fall back to
+  // http://localhost (the Capacitor bridge intercepts these requests before
+  // they leave the device, so this does not expose the API to arbitrary
+  // local services on a developer machine).
+  'capacitor://localhost',
+  'http://localhost',
+]);
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;

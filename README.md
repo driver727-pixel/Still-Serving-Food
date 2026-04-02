@@ -79,6 +79,58 @@ Then open <http://localhost:3000> in your browser.
 
 ---
 
+## Mobile Builds (Capacitor)
+
+The web frontend can be packaged into an Android APK or iOS IPA using [Capacitor](https://capacitorjs.com/). The Express API stays deployed at `https://letsnarf.com`; the native app talks to it directly.
+
+### Prerequisites
+
+- Node.js 18+
+- For Android: Android Studio with an Android SDK installed
+- For iOS: macOS with Xcode 14+ installed
+
+### First-time setup
+
+```bash
+# Install dependencies (Capacitor packages are already listed in package.json)
+npm install
+```
+
+### Add / update native platforms
+
+```bash
+# Android
+npx cap add android        # scaffold the android/ project (first time only)
+npx cap sync android       # copy web assets + apply config changes
+
+# iOS (macOS only)
+npx cap add ios            # scaffold the ios/ project (first time only)
+npx cap sync ios           # copy web assets + apply config changes
+```
+
+### Open in native IDE
+
+```bash
+npx cap open android       # opens Android Studio
+npx cap open ios           # opens Xcode (macOS only)
+```
+
+Build and sign the app from within the IDE as you normally would.
+
+### Syncing web changes
+
+After editing anything in `public/`, run:
+
+```bash
+npx cap sync
+```
+
+This copies the updated web assets into every added native platform.
+
+> **Note:** The `android/` and `ios/` directories are listed in `.gitignore` and are not committed. Re-generate them from scratch with `npx cap add android` / `npx cap add ios` on any machine.
+
+---
+
 ## Test Drive (GitHub Actions)
 
 Want to try the app without cloning it locally? Use the **Test Drive 🍔** workflow:

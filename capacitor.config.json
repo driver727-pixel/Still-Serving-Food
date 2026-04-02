@@ -1,0 +1,9 @@
+{
+  "appId": "com.letsnarf.stillservingfood",
+  "appName": "Still Serving Food",
+  "webDir": "public",
+  "server": {
+    "url": "https://letsnarf.com",
+    "cleartext": false
+  }
+}

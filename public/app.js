@@ -1,5 +1,17 @@
 'use strict';
 
+/**
+ * When running inside a Capacitor native shell the page is served from a
+ * local bridge origin (capacitor://localhost or http://localhost) and cannot
+ * reach relative /api paths.  In that case all API calls go to the live
+ * production server.  In a regular browser the empty string keeps requests
+ * relative (same-origin).
+ */
+const API_BASE =
+  typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform()
+    ? 'https://letsnarf.com'
+    : '';
+
 /* ---- DOM refs ---- */
 const form = document.getElementById('search-form');
 const nameInput = document.getElementById('name-input');
@@ -75,7 +87,7 @@ function runAdCountdown() {
       adCountdown.textContent = 'Ad complete!';
       adContinueBtn.disabled = false;
       // Pre-fetch a token so it is ready when user clicks continue
-      fetch('/api/ad-token')
+      fetch(`${API_BASE}/api/ad-token`)
         .then((r) => r.json())
         .then((d) => {
           pendingAdToken = d.token || null;
@@ -138,7 +150,7 @@ async function doSearch(params, adToken) {
     if (params.servingUntil) qs.set('servingUntil', params.servingUntil);
     if (adToken) qs.set('adToken', adToken);
 
-    const res = await fetch(`/api/search?${qs.toString()}`);
+    const res = await fetch(`${API_BASE}/api/search?${qs.toString()}`);
 
     if (res.status === 402) {
       // Ad required — server says the free quota is exhausted for this IP
