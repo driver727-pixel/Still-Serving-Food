@@ -36,7 +36,22 @@ app.use((_req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+    [
+      "default-src 'self'",
+      // Allow Google AdSense scripts alongside the site's own scripts
+      "script-src 'self' https://pagead2.googlesyndication.com https://partner.googleadservices.com",
+      // AdSense injects inline styles; 'unsafe-inline' is required for it to render correctly
+      "style-src 'self' 'unsafe-inline'",
+      // Allow ad-creative images from Google's CDNs
+      "img-src 'self' data: https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.gstatic.com",
+      // Allow AdSense to phone home for ad delivery and measurement
+      "connect-src 'self' https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://adservice.google.com",
+      // AdSense renders creatives inside sandboxed iframes on these origins
+      "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; '),
   );
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
   next();

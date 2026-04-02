@@ -27,6 +27,7 @@ const adSeconds = document.getElementById('ad-seconds');
 /* ---- State ---- */
 let allVenues = [];
 let currentFilter = 'all';
+let adsInitialized = false;
 
 const AD_DURATION_MS = 5000;
 const STORAGE_KEY = 'ssf_free_search_used';
@@ -279,6 +280,27 @@ function buildCard(venue) {
   return card;
 }
 
+/* ---- Ads ---- */
+/**
+ * Push each AdSense slot the first time results are displayed.
+ * Called once per page load; subsequent calls are no-ops.
+ * Replace YOUR_AD_SLOT_ID placeholders in index.html with real slot IDs
+ * from your AdSense account once the account is approved.
+ */
+function initAds() {
+  if (adsInitialized) return;
+  adsInitialized = true;
+  const slots = document.querySelectorAll('.adsbygoogle');
+  // adsbygoogle.push({}) processes slots sequentially — call it once per <ins> element
+  for (let i = 0; i < slots.length; i++) {
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {
+      // adsbygoogle script may be blocked or not yet loaded
+    }
+  }
+}
+
 /* ---- Helpers ---- */
 function minsToTime(mins) {
   if (mins == null) return '?';
@@ -302,6 +324,7 @@ function showLoading(show) {
 
 function showResults(show) {
   resultsSection.classList.toggle('hidden', !show);
+  if (show) initAds();
 }
 
 function hideResults() {

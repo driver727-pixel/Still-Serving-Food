@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="en">
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6419733083900935" crossorigin="anonymous"></script>
   <head>
     <meta charset="UTF-8" />
+    <!-- Google AdSense — loads ad scripts; ad units are inserted after search results -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6419733083900935" crossorigin="anonymous"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Primary Meta Tags -->
@@ -180,7 +181,36 @@
           <input id="refine-name" type="text" class="refine-input" placeholder="Type to filter results…" />
         </div>
 
+        <!--
+          AdSense: ad unit shown above search results.
+          TODO after AdSense approval:
+            1. Go to AdSense → By ad unit → Display ads → create a new unit.
+            2. Copy the numeric data-ad-slot value (e.g. "1234567890").
+            3. Replace BOTH occurrences of "YOUR_AD_SLOT_ID" below with that value
+               (or use separate slot IDs for each placement if you prefer).
+        -->
+        <div class="search-ad" aria-label="Advertisement">
+          <p class="search-ad-label">Advertisement</p>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-6419733083900935"
+               data-ad-slot="YOUR_AD_SLOT_ID"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
+
         <div id="venue-list" class="venue-list"></div>
+
+        <!-- AdSense: second ad unit shown below search results (see TODO comment above). -->
+        <div class="search-ad" aria-label="Advertisement">
+          <p class="search-ad-label">Advertisement</p>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-6419733083900935"
+               data-ad-slot="YOUR_AD_SLOT_ID"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
       </section>
 
       <section id="loading" class="loading hidden">
