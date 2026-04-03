@@ -233,7 +233,7 @@ async function doSearch(params, adToken, subscriberToken) {
         // Subscriber has exhausted their 100-search pass
         clearSubscriberToken();
         showUpgradePrompt(true);
-        showError('You\'ve used all your searches. Purchase another pass to continue.');
+        showError('You\u2019ve used all your searches. Purchase another pass to continue.');
         return;
       }
 

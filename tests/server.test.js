@@ -33,6 +33,8 @@ beforeEach(() => {
   app._searchCounters.clear();
   app._adTokens.clear();
   app._subscriberSearches.clear();
+  if (app._activateRateLimits) app._activateRateLimits.clear();
+  if (app._subscriberStatusLimits) app._subscriberStatusLimits.clear();
   jest.clearAllMocks();
 });
 

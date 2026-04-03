@@ -151,6 +151,38 @@ const subscriberSearches = new Map();
 // JWT signing secret — set SUBSCRIBER_SECRET in production to a long random string
 const SUBSCRIBER_SECRET = process.env.SUBSCRIBER_SECRET || 'change-me-in-production';
 
+if (!process.env.SUBSCRIBER_SECRET && process.env.NODE_ENV !== 'test') {
+  console.warn(
+    '[WARN] SUBSCRIBER_SECRET is not set. Using an insecure default. ' +
+    'Set this environment variable to a long random string in production.',
+  );
+}
+
+/**
+ * Simple per-IP rate limiter: allows at most `maxRequests` in a rolling `windowMs`
+ * window.  Returns true if the request should be allowed, false to reject.
+ * @param {Map<string, {count: number, resetAt: number}>} store
+ * @param {string} ip
+ * @param {number} maxRequests
+ * @param {number} windowMs
+ * @returns {boolean}
+ */
+function checkRateLimit(store, ip, maxRequests, windowMs) {
+  const now = Date.now();
+  const entry = store.get(ip);
+  if (!entry || now > entry.resetAt) {
+    store.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxRequests) return false;
+  entry.count += 1;
+  return true;
+}
+
+// Rate-limit stores for auth-sensitive endpoints
+const activateRateLimits = new Map();    // /api/activate — 10 per IP per hour
+const subscriberStatusLimits = new Map(); // /api/subscriber-status — 120 per IP per hour
+
 function verifySubscriberToken(token) {
   if (!token || typeof token !== 'string') return { valid: false };
   try {
@@ -164,6 +196,8 @@ function verifySubscriberToken(token) {
 
 // Expose for testing
 app._subscriberSearches = subscriberSearches;
+app._activateRateLimits = activateRateLimits;
+app._subscriberStatusLimits = subscriberStatusLimits;
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -230,11 +264,17 @@ app.get('/api/ad-token', (_req, res) => {
  * Results are cached for 10 minutes.
  */
 app.get('/api/search', async (req, res) => {
-  const { location, name, servingUntil, limit, adToken, subscriberToken } = req.query;
+  // Coerce query params to strings to guard against array injection (?p=a&p=b)
+  const location = typeof req.query.location === 'string' ? req.query.location : '';
+  const name = typeof req.query.name === 'string' ? req.query.name : '';
+  const servingUntil = typeof req.query.servingUntil === 'string' ? req.query.servingUntil : '';
+  const limit = typeof req.query.limit === 'string' ? req.query.limit : '';
+  const adToken = typeof req.query.adToken === 'string' ? req.query.adToken : '';
+  const subscriberToken = typeof req.query.subscriberToken === 'string' ? req.query.subscriberToken : '';
 
   // At least one search dimension must be provided
-  const hasLocation = location && typeof location === 'string' && location.trim();
-  const hasName = name && typeof name === 'string' && name.trim();
+  const hasLocation = location.trim().length > 0;
+  const hasName = name.trim().length > 0;
 
   if (!hasLocation && !hasName) {
     return res.status(400).json({ error: 'Provide at least a location or restaurant name to search.' });
@@ -391,9 +431,14 @@ app.post('/api/create-checkout-session', async (_req, res) => {
  * client which stores it in localStorage.
  */
 app.get('/api/activate', async (req, res) => {
-  const { session_id: sessionId } = req.query;
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(activateRateLimits, ip, 10, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many activation attempts. Please try again later.' });
+  }
 
-  if (!sessionId || typeof sessionId !== 'string') {
+  const sessionId = typeof req.query.session_id === 'string' ? req.query.session_id : '';
+
+  if (!sessionId) {
     return res.status(400).json({ error: 'session_id is required.' });
   }
 
@@ -431,7 +476,12 @@ app.get('/api/activate', async (req, res) => {
  * Expects the subscriber JWT as the `subscriberToken` query parameter.
  */
 app.get('/api/subscriber-status', (req, res) => {
-  const token = req.query.subscriberToken;
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(subscriberStatusLimits, ip, 120, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many requests. Please slow down.' });
+  }
+
+  const token = typeof req.query.subscriberToken === 'string' ? req.query.subscriberToken : '';
   const result = verifySubscriberToken(token);
 
   if (!result.valid) {
