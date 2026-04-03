@@ -288,9 +288,12 @@ async function searchOsmVenues({ location, radiusKm = DEFAULT_RADIUS_KM, limit =
  *
  * @param {Venue[]} venues
  * @param {Array<{name,openingHoursText,kitchenHoursText}>} osmVenues
+ * @param {Date} [now]  Reference time for open/closed determination.  Pass a
+ *   timezone-adjusted Date to get accurate results when the server runs in a
+ *   different timezone from the venues.
  * @returns {Venue[]}
  */
-function enrichVenuesWithOsmData(venues, osmVenues) {
+function enrichVenuesWithOsmData(venues, osmVenues, now = new Date()) {
   function normaliseName(n) {
     return (n || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
   }
@@ -320,7 +323,7 @@ function enrichVenuesWithOsmData(venues, osmVenues) {
 
     const status = is24Hours
       ? { serving: true, opensAt: null, closesAt: null }
-      : isCurrentlyServing(hourBlocks);
+      : isCurrentlyServing(hourBlocks, now);
 
     return {
       ...venue,

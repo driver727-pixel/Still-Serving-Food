@@ -10,7 +10,7 @@
  */
 
 const FirecrawlApp = require('@mendable/firecrawl-js').default;
-const { parseHours, isCurrentlyServing, formatTime, detect24Hours } = require('./hoursParser');
+const { parseHours, isCurrentlyServing, formatTime, detect24Hours, computeLocalNow } = require('./hoursParser');
 
 // ---------------------------------------------------------------------------
 // Relevance filtering — keep only commercial restaurant/food-truck pages
@@ -119,9 +119,10 @@ const REAL_WEBSITE_RE =
  *
  * @param {object} raw          Raw Firecrawl result for the link-aggregator URL
  * @param {FirecrawlApp} client Firecrawl client instance
+ * @param {Date} [now]          Reference time for open/closed check
  * @returns {Promise<Venue|null>}
  */
-async function maybeFollowLinkAggregator(raw, client) {
+async function maybeFollowLinkAggregator(raw, client, now = new Date()) {
   // Collect candidate URLs: structured links array first, then markdown text
   const candidates = [];
 
@@ -149,7 +150,7 @@ async function maybeFollowLinkAggregator(raw, client) {
   // Try to scrape the first candidate URL
   try {
     const result = await client.scrape(candidates[0], { formats: ['markdown'] });
-    return buildVenue({ url: candidates[0], ...result });
+    return buildVenue({ url: candidates[0], ...result }, now);
   } catch {
     return null;
   }
@@ -226,6 +227,7 @@ function buildQuery(params = {}) {
  * @param {object} [options]
  * @param {string} [options.apiKey] - Overrides process.env.FIRECRAWL_API_KEY
  * @param {number} [options.limit=10] - Max number of venues to process
+ * @param {number} [options.utcOffsetMinutes=0] - User's UTC offset (minutes east of UTC)
  * @returns {Promise<Venue[]>}
  */
 async function searchVenues(searchParams, options = {}) {
@@ -240,6 +242,7 @@ async function searchVenues(searchParams, options = {}) {
   }
 
   const limit = options.limit || 10;
+  const localNow = computeLocalNow(options.utcOffsetMinutes || 0);
   const client = buildClient(apiKey);
 
   const query = buildQuery(searchParams);
@@ -267,12 +270,12 @@ async function searchVenues(searchParams, options = {}) {
     (result) => LINK_AGGREGATOR_RE.test(result.url || ''),
   );
 
-  const venues = regularResults.map((result) => buildVenue(result));
+  const venues = regularResults.map((result) => buildVenue(result, localNow));
 
   // Process link-aggregator results concurrently (best-effort).
   if (aggregatorResults.length > 0) {
     const followed = await Promise.all(
-      aggregatorResults.map((raw) => maybeFollowLinkAggregator(raw, client).catch(() => null)),
+      aggregatorResults.map((raw) => maybeFollowLinkAggregator(raw, client, localNow).catch(() => null)),
     );
     for (const v of followed) {
       if (v) venues.push(v);
@@ -288,6 +291,7 @@ async function searchVenues(searchParams, options = {}) {
  * @param {string} url - The venue website URL
  * @param {object} [options]
  * @param {string} [options.apiKey]
+ * @param {number} [options.utcOffsetMinutes=0] - User's UTC offset (minutes east of UTC)
  * @returns {Promise<Venue>}
  */
 async function scrapeVenue(url, options = {}) {
@@ -296,6 +300,7 @@ async function scrapeVenue(url, options = {}) {
     throw new Error('FIRECRAWL_API_KEY is not set. Add it to your .env file.');
   }
 
+  const localNow = computeLocalNow(options.utcOffsetMinutes || 0);
   const client = buildClient(apiKey);
 
   let result;
@@ -307,15 +312,19 @@ async function scrapeVenue(url, options = {}) {
     throw new Error(`Firecrawl scrape failed for ${url}: ${err.message}`);
   }
 
-  return buildVenue({ url, ...result });
+  return buildVenue({ url, ...result }, localNow);
 }
 
 /**
  * Convert a raw Firecrawl result into a structured Venue object.
  * @param {object} raw
+ * @param {Date} [now] - The reference time to use for open/closed determination.
+ *   Defaults to the current system time.  Pass a timezone-adjusted Date to
+ *   avoid the UTC-vs-local mismatch when the server runs in a different
+ *   timezone from the venue.
  * @returns {Venue}
  */
-function buildVenue(raw) {
+function buildVenue(raw, now = new Date()) {
   const text = [raw.markdown || '', raw.content || '', raw.description || ''].join('\n');
   const is24Hours = detect24Hours(text);
   const hourBlocks = parseHours(text);
@@ -323,7 +332,7 @@ function buildVenue(raw) {
   // 24-hour establishments are always serving; skip the time-window check.
   const status = is24Hours
     ? { serving: true, opensAt: null, closesAt: null }
-    : isCurrentlyServing(hourBlocks);
+    : isCurrentlyServing(hourBlocks, now);
 
   // Derive a display name: prefer metadata title, fall back to hostname
   let name = raw.metadata?.title || raw.title || '';

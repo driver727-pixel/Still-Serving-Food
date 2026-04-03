@@ -160,7 +160,7 @@ describe('GET /api/search', () => {
     await request(app).get('/api/search?location=Brooklyn,NY&limit=5');
     expect(scraper.searchVenues).toHaveBeenCalledWith(
       { location: 'Brooklyn,NY', name: '', servingUntil: '' },
-      { limit: 5 },
+      { limit: 5, utcOffsetMinutes: 0 },
     );
   });
 

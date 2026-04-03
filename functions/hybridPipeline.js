@@ -49,7 +49,7 @@ const { scrapeFacebookPage } = require('./facebookScraper');
 const { scrapeInstagramPage } = require('./instagramScraper');
 const { searchOsmVenues, enrichVenuesWithOsmData } = require('./osmClient');
 const { searchFoursquareVenues, enrichVenuesWithFoursquareData } = require('./foursquareClient');
-const { isCurrentlyServing, formatTime, detect24Hours } = require('./hoursParser');
+const { isCurrentlyServing, formatTime, detect24Hours, computeLocalNow } = require('./hoursParser');
 
 /** Maximum number of concurrent Firecrawl scrape calls in Phase 2. */
 const PHASE2_CONCURRENCY = 5;
@@ -71,9 +71,10 @@ const PHASE3_CONCURRENCY = 3;
  *   3. No hours (hourBlocks=[])
  *
  * @param {PlaceResult} place
+ * @param {Date} [now]  Reference time for open/closed determination
  * @returns {Venue}
  */
-function buildVenueFromPlace(place) {
+function buildVenueFromPlace(place, now = new Date()) {
   // Prefer kitchen-specific hours, then fall back to general opening hours
   const hourBlocks = place.kitchenHours || place.openingHours || [];
   const hoursSource =
@@ -85,7 +86,7 @@ function buildVenueFromPlace(place) {
   const status =
     hourBlocks.length === 0
       ? { serving: false, opensAt: null, closesAt: null }
-      : isCurrentlyServing(hourBlocks);
+      : isCurrentlyServing(hourBlocks, now);
 
   return {
     name: place.name,
@@ -120,10 +121,11 @@ function buildVenueFromPlace(place) {
  * @param {PlaceResult & {facebookUrl: string|null, instagramUrl: string|null}} place
  * @param {FacebookResult|null} fbData
  * @param {InstagramResult|null} [igData]
+ * @param {Date} [now]  Reference time for open/closed determination
  * @returns {Venue}
  */
-function mergeVenue(place, fbData, igData) {
-  const base = buildVenueFromPlace(place);
+function mergeVenue(place, fbData, igData, now = new Date()) {
+  const base = buildVenueFromPlace(place, now);
 
   // --- Facebook hours (highest social priority) ---
   if (fbData && (fbData.hourBlocks.length > 0 || fbData.is24Hours)) {
@@ -184,6 +186,8 @@ function mergeVenue(place, fbData, igData) {
  * @param {string} [options.googlePlacesApiKey] Overrides GOOGLE_PLACES_API_KEY
  * @param {string} [options.apifyApiKey]        Overrides APIFY_API_KEY
  * @param {string} [options.foursquareApiKey]   Overrides FOURSQUARE_API_KEY
+ * @param {number} [options.utcOffsetMinutes=0] User's UTC offset (minutes east of UTC,
+ *   e.g. −300 for EST/UTC−5).  Used to compare current time against local venue hours.
  * @returns {Promise<Venue[]>}
  */
 async function runHybridPipeline(searchParams, options = {}) {
@@ -193,7 +197,14 @@ async function runHybridPipeline(searchParams, options = {}) {
     googlePlacesApiKey = process.env.GOOGLE_PLACES_API_KEY,
     apifyApiKey = process.env.APIFY_API_KEY,
     foursquareApiKey = process.env.FOURSQUARE_API_KEY,
+    utcOffsetMinutes = 0,
   } = options;
+
+  // Compute a single reference time for this pipeline run.
+  // All isCurrentlyServing() calls use this adjusted Date so that restaurant
+  // hours (stored in the venue's local time) are compared against the correct
+  // local time — not the server's UTC clock.
+  const localNow = computeLocalNow(utcOffsetMinutes);
 
   // ── Phase 1: Entity Verification ─────────────────────────────────────────
   // Returns PlaceResult objects now including openingHours and kitchenHours.
@@ -232,6 +243,7 @@ async function runHybridPipeline(searchParams, options = {}) {
         const result = await scrapeFacebookPage(place.facebookUrl, {
           firecrawlApiKey,
           apifyApiKey,
+          now: localNow,
         }).catch(() => null);
         return { facebookUrl: place.facebookUrl, result };
       }),
@@ -260,6 +272,7 @@ async function runHybridPipeline(searchParams, options = {}) {
         batch.map(async (place) => {
           const result = await scrapeInstagramPage(place.instagramUrl, {
             apifyApiKey,
+            now: localNow,
           }).catch(() => null);
           return { instagramUrl: place.instagramUrl, result };
         }),
@@ -277,6 +290,7 @@ async function runHybridPipeline(searchParams, options = {}) {
         place,
         fbResults.get(place.facebookUrl) ?? null,
         place.instagramUrl ? (igResults.get(place.instagramUrl) ?? null) : null,
+        localNow,
       ),
     ),
     ...nonFbPlaces.map((place) =>
@@ -284,6 +298,7 @@ async function runHybridPipeline(searchParams, options = {}) {
         place,
         null,
         place.instagramUrl ? (igResults.get(place.instagramUrl) ?? null) : null,
+        localNow,
       ),
     ),
   ];
@@ -298,7 +313,7 @@ async function runHybridPipeline(searchParams, options = {}) {
         location: searchParams.location,
         limit: Math.max(limit * 2, 40),
       });
-      venues = enrichVenuesWithOsmData(venues, osmVenues);
+      venues = enrichVenuesWithOsmData(venues, osmVenues, localNow);
     } catch {
       // OSM is an optional enrichment; continue without it
     }
@@ -313,7 +328,7 @@ async function runHybridPipeline(searchParams, options = {}) {
         limit: Math.max(limit * 2, 40),
         apiKey: foursquareApiKey,
       });
-      venues = enrichVenuesWithFoursquareData(venues, fsqVenues);
+      venues = enrichVenuesWithFoursquareData(venues, fsqVenues, localNow);
     } catch {
       // Foursquare is an optional enrichment; continue without it
     }
