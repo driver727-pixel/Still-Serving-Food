@@ -221,11 +221,13 @@ async function scrapeWithFirecrawl(fbUrl, apiKey) {
  * @param {object} [options]
  * @param {string} [options.firecrawlApiKey]
  * @param {string} [options.apifyApiKey]
+ * @param {Date}   [options.now]  Reference time for open/closed determination
  * @returns {Promise<FacebookResult>}
  */
 async function scrapeFacebookPage(fbUrl, options = {}) {
   const firecrawlKey = options.firecrawlApiKey || process.env.FIRECRAWL_API_KEY;
   const apifyKey = options.apifyApiKey || process.env.APIFY_API_KEY;
+  const now = options.now || new Date();
 
   let aboutText = '';
   let recentPosts = [];
@@ -267,7 +269,7 @@ async function scrapeFacebookPage(fbUrl, options = {}) {
   const hourBlocks = parseHours(combinedText);
   const status = is24Hours
     ? { serving: true, opensAt: null, closesAt: null }
-    : isCurrentlyServing(hourBlocks);
+    : isCurrentlyServing(hourBlocks, now);
 
   // Determine the hours data source for the frontend tag
   let hoursSource = null;

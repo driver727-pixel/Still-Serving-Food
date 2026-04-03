@@ -221,9 +221,12 @@ async function searchFoursquareVenues({ location, limit = 20, apiKey } = {}) {
  *
  * @param {Venue[]} venues
  * @param {Array<{name,hourBlocks,tipTexts}>} fsqVenues
+ * @param {Date} [now]  Reference time for open/closed determination.  Pass a
+ *   timezone-adjusted Date to get accurate results when the server runs in a
+ *   different timezone from the venues.
  * @returns {Venue[]}
  */
-function enrichVenuesWithFoursquareData(venues, fsqVenues) {
+function enrichVenuesWithFoursquareData(venues, fsqVenues, now = new Date()) {
   function normaliseName(n) {
     return (n || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
   }
@@ -254,7 +257,7 @@ function enrichVenuesWithFoursquareData(venues, fsqVenues) {
     if (hourBlocks.length === 0 && !is24Hours) return venue;
     const status = is24Hours
       ? { serving: true, opensAt: null, closesAt: null }
-      : isCurrentlyServing(hourBlocks);
+      : isCurrentlyServing(hourBlocks, now);
 
     return {
       ...venue,

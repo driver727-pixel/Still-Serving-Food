@@ -123,6 +123,9 @@ function getSearchParams() {
     name: nameInput.value.trim(),
     location: locationInput.value.trim(),
     servingUntil: servingUntilInput.value.trim(),
+    // Send the browser's UTC offset so the server compares venue hours in
+    // the user's local time rather than the server's clock (typically UTC).
+    utcOffset: -new Date().getTimezoneOffset(),
   };
 }
 
@@ -136,6 +139,7 @@ async function doSearch(params, adToken) {
     if (params.name) qs.set('name', params.name);
     if (params.location) qs.set('location', params.location);
     if (params.servingUntil) qs.set('servingUntil', params.servingUntil);
+    if (params.utcOffset !== undefined) qs.set('utcOffset', params.utcOffset);
     if (adToken) qs.set('adToken', adToken);
 
     const res = await fetch(`/api/search?${qs.toString()}`);

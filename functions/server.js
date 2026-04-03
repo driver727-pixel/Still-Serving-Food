@@ -175,7 +175,7 @@ app.get('/api/ad-token', (_req, res) => {
  * Results are cached for 10 minutes.
  */
 app.get('/api/search', async (req, res) => {
-  const { location, name, servingUntil, limit, adToken } = req.query;
+  const { location, name, servingUntil, limit, adToken, utcOffset } = req.query;
 
   // At least one search dimension must be provided
   const hasLocation = location && typeof location === 'string' && location.trim();
@@ -196,6 +196,10 @@ app.get('/api/search', async (req, res) => {
   if (servingUntil && servingUntil.length > 50) {
     return res.status(400).json({ error: 'servingUntil is too long (max 50 characters)' });
   }
+
+  // Parse the user's UTC offset (minutes east of UTC, e.g. -300 for EST).
+  // Clamp to a valid range (±840 minutes covers all real-world offsets).
+  const parsedUtcOffset = Math.max(-840, Math.min(840, parseInt(utcOffset, 10) || 0));
 
   // Build a stable cache key from all search dimensions
   const cacheKey = [
@@ -231,13 +235,13 @@ app.get('/api/search', async (req, res) => {
       // Hybrid pipeline: Google Places entity verification → Facebook scraping
       venues = await runHybridPipeline(
         { location: location || '', name: name || '', servingUntil: servingUntil || '' },
-        { limit: parseInt(limit, 10) || 10 },
+        { limit: parseInt(limit, 10) || 10, utcOffsetMinutes: parsedUtcOffset },
       );
     } else {
       // Legacy pipeline: Firecrawl web search
       venues = await searchVenues(
         { location: location || '', name: name || '', servingUntil: servingUntil || '' },
-        { limit: parseInt(limit, 10) || 10 },
+        { limit: parseInt(limit, 10) || 10, utcOffsetMinutes: parsedUtcOffset },
       );
     }
 

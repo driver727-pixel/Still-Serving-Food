@@ -7,6 +7,7 @@ const {
   formatTime,
   expandDayRange,
   detect24Hours,
+  computeLocalNow,
 } = require('../functions/hoursParser');
 
 // ---------------------------------------------------------------------------
@@ -376,5 +377,71 @@ describe('parseHours hint patterns', () => {
     expect(isCurrentlyServing([hint], d).serving).toBe(true);
     // With both, explicit block wins and 22:00 is past 21:00 close → not serving
     expect(isCurrentlyServing([explicit, hint], d).serving).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeLocalNow
+// ---------------------------------------------------------------------------
+describe('computeLocalNow', () => {
+  test('offset=0 returns approximately the same time as new Date()', () => {
+    const before = Date.now();
+    const result = computeLocalNow(0);
+    const after = Date.now();
+    expect(result.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(result.getTime()).toBeLessThanOrEqual(after + 1000);
+  });
+
+  test('positive offset advances the time by the given minutes', () => {
+    // UTC+5 (300 minutes) should return a Date whose getHours() is 5 hours
+    // ahead of what a UTC clock shows.
+    const utcNow = new Date();
+    const localNow = computeLocalNow(300);
+    // The difference between the two Date objects' getTime() values reflects the
+    // server-offset adjustment. What matters is that getHours() is offset by +5h.
+    const utcHours = new Date(utcNow.getTime() + utcNow.getTimezoneOffset() * 60 * 1000).getHours();
+    const localHours = localNow.getHours();
+    expect((localHours - utcHours + 24) % 24).toBe(5);
+  });
+
+  test('negative offset retreats the time by the given minutes', () => {
+    // UTC-5 (EST, -300 minutes) should return a Date 5 hours behind UTC.
+    const utcNow = new Date();
+    const localNow = computeLocalNow(-300);
+    const utcHours = new Date(utcNow.getTime() + utcNow.getTimezoneOffset() * 60 * 1000).getHours();
+    const localHours = localNow.getHours();
+    expect((localHours - utcHours + 24) % 24).toBe(19); // 24 - 5 = 19
+  });
+
+  test('timezone-offset date produces correct isCurrentlyServing result', () => {
+    // Simulate a server in UTC, user in EST (UTC-5).
+    // It is 2 pm EST = 7 pm UTC (19:00).
+    // A lunch-only restaurant open Mon-Fri 11am-3pm should show serving=true at 2pm EST.
+
+    // Build a UTC date representing 19:00 UTC on a Monday (any Monday).
+    const utcMonday19 = new Date();
+    // Walk to the nearest Monday
+    const daysUntilMon = (1 - utcMonday19.getDay() + 7) % 7 || 7;
+    utcMonday19.setDate(utcMonday19.getDate() + daysUntilMon);
+    // Force the UTC clock to 19:00 UTC using setUTCHours so the test is
+    // timezone-independent (the test runner may itself be in any timezone).
+    utcMonday19.setUTCHours(19, 0, 0, 0);
+
+    // Simulate the server being in UTC: computeLocalNow(-300) from that point.
+    // We manually construct the adjusted Date using the same formula.
+    const utcOffsetMinutes = -300; // EST
+    const ms = utcMonday19.getTime() + (utcOffsetMinutes + utcMonday19.getTimezoneOffset()) * 60 * 1000;
+    const localNow = new Date(ms);
+
+    // Lunch-only block: Monday 11am-3pm
+    const blocks = [{ day: 1, open: 11 * 60, close: 15 * 60, label: 'monday', inFoodSection: true }];
+
+    // Without timezone adjustment: UTC 19:00 is outside 11-15 → false (broken behaviour)
+    const wrongResult = isCurrentlyServing(blocks, utcMonday19);
+    expect(wrongResult.serving).toBe(false); // 19:00 UTC is past 15:00 close
+
+    // With timezone adjustment: local 14:00 is inside 11-15 → true (correct behaviour)
+    const correctResult = isCurrentlyServing(blocks, localNow);
+    expect(correctResult.serving).toBe(true);
   });
 });

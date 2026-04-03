@@ -143,10 +143,12 @@ async function fetchInstagramPostsWithApify(igUrl, apifyKey) {
  * @param {string} igUrl  Canonical Instagram profile URL (e.g. "https://www.instagram.com/thepub")
  * @param {object} [options]
  * @param {string} [options.apifyApiKey]  Overrides APIFY_API_KEY env var
+ * @param {Date}   [options.now]          Reference time for open/closed determination
  * @returns {Promise<{igUrl:string, recentPosts:string[], hourBlocks:object[], is24Hours:boolean, serving:boolean, opensAt:string|null, closesAt:string|null, hoursSource:string|null}>}
  */
 async function scrapeInstagramPage(igUrl, options = {}) {
   const apifyKey = options.apifyApiKey || process.env.APIFY_API_KEY;
+  const now = options.now || new Date();
 
   const EMPTY = {
     igUrl,
@@ -178,7 +180,7 @@ async function scrapeInstagramPage(igUrl, options = {}) {
   const hourBlocks = parseHours(combinedText);
   const status = is24Hours
     ? { serving: true, opensAt: null, closesAt: null }
-    : isCurrentlyServing(hourBlocks);
+    : isCurrentlyServing(hourBlocks, now);
 
   const hoursSource =
     hourBlocks.length > 0 || is24Hours ? 'instagram_post' : null;

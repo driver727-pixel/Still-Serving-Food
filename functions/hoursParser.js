@@ -420,4 +420,35 @@ function formatTime(minutes) {
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
-module.exports = { parseHours, isCurrentlyServing, formatTime, parseTime, expandDayRange, detect24Hours };
+/**
+ * Compute a Date object whose getDay() / getHours() / getMinutes() reflect the
+ * user's local time rather than the server's local time.
+ *
+ * Restaurant hours stored in all data sources (Google Places, Foursquare, OSM,
+ * social scrapers) are in the *venue's* local time zone.  The server typically
+ * runs in UTC, so using plain `new Date()` for comparison yields wrong results
+ * for any timezone that differs from the server's.
+ *
+ * Formula (works for any server timezone):
+ *   adjustedMs = utcMs + userOffsetMs − serverOffsetMs
+ *
+ * where
+ *   utcMs        = now.getTime()
+ *   userOffsetMs = utcOffsetMinutes * 60 * 1000
+ *   serverOffsetMs = −now.getTimezoneOffset() * 60 * 1000
+ *
+ * The resulting Date's getDay() / getHours() / getMinutes() then return the
+ * correct values for the user's local time when interpreted in the server's
+ * timezone.
+ *
+ * @param {number} [utcOffsetMinutes=0]  User's UTC offset in minutes east of UTC
+ *   (e.g. −300 for EST/UTC−5, +60 for CET/UTC+1).  Defaults to 0 (UTC).
+ * @returns {Date}
+ */
+function computeLocalNow(utcOffsetMinutes = 0) {
+  const now = new Date();
+  const ms = now.getTime() + (utcOffsetMinutes + now.getTimezoneOffset()) * 60 * 1000;
+  return new Date(ms);
+}
+
+module.exports = { parseHours, isCurrentlyServing, formatTime, parseTime, expandDayRange, detect24Hours, computeLocalNow };
