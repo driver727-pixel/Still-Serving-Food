@@ -35,6 +35,74 @@ const FOOD_SECTION_KEYWORDS = [
 ];
 
 /**
+ * Regex alternation matching the food-service keywords used in the hint
+ * patterns below. Kept as a constant so the set of recognised keywords stays
+ * consistent across all three hint regexes.
+ *
+ * Includes "last orders?" because phrases like "last food orders at 9pm" are
+ * common on UK pub/restaurant websites.
+ */
+const FOOD_KW = '(?:grill|kitchen|food|hot\\s+food|dining|serving|seating|taking\\s+orders?|last\\s+(?:food\\s+)?orders?)';
+
+/** Matches any 12/24-hour clock time with optional am/pm, e.g. "9pm", "11:30 am", "23:00". */
+const TIME_RE = '\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?';
+
+/** Matches named close times. */
+const NAMED_TIME_RE = `(?:${TIME_RE}|midnight|noon)`;
+
+/**
+ * Pre-built RegExp objects for the three hint pattern categories.
+ * Using new RegExp() lets us compose them from the shared constants above.
+ */
+
+/**
+ * Matches a food-service open AND close time on the same line without a
+ * day-of-week prefix. The qualifier group (hours/opens/from/available) is
+ * optional so bare "serving 9am-10pm" also matches.
+ *
+ * Examples: "food from 9am to 10pm", "kitchen open 11am-10pm",
+ *           "serving 9am - 10pm", "grill hours: 9am-10pm"
+ */
+const COMBINED_HINT_RE = new RegExp(
+  `\\b${FOOD_KW}\\s+` +
+  // optional qualifier: "hours:", "opens at", "from", "available from", "service:"
+  `(?:hours?[:\\s]+|opens?\\s*(?:(?:at|from)\\s+)?|from\\s+|available\\s+(?:from\\s+)?|service[:\\s]+)?` +
+  `(${TIME_RE}|noon)` +                          // group 1: open time
+  `\\s*(?:–|-|to|until|till)\\s*` +              // separator
+  `(${NAMED_TIME_RE})`,                          // group 2: close time
+  'gi',
+);
+
+/**
+ * Matches an opening-only food-service time (no explicit close time).
+ *
+ * Examples: "kitchen opens at 9am", "food from 9am",
+ *           "serving starts at 11am", "grill available from 9am"
+ */
+const OPENING_HINT_RE = new RegExp(
+  `\\b${FOOD_KW}\\s+` +
+  // qualifier that signals an opening: opens/starts/available from/from
+  `(?:opens?\\s*(?:at|from)?\\s*|starts?\\s*(?:at|from)?\\s*|(?:is\\s+)?available\\s+(?:from\\s+|starting\\s+)?|from\\s+)` +
+  `(${TIME_RE}|noon)`,                           // group 1: open time
+  'gi',
+);
+
+/**
+ * Matches a closing-only food-service time (no explicit open time).
+ *
+ * Examples: "food until 10pm", "kitchen closes at 9pm",
+ *           "serving until 2am", "seating until midnight",
+ *           "taking orders until 9pm", "last food orders at 10pm"
+ */
+const CLOSING_HINT_RE = new RegExp(
+  `\\b${FOOD_KW}\\s+` +
+  // qualifier that signals a closing: closes at / until / till / ends at
+  `(?:close[sd]?\\s+at|(?:is\\s+)?(?:available\\s+)?until|'?til|till|ends?\\s+at)\\s+` +
+  `(${NAMED_TIME_RE})`,                          // group 1: close time
+  'gi',
+);
+
+/**
  * Convert a 12-hour time string ("11:30 pm", "2am", "midnight") into minutes
  * since midnight.
  * @param {string} raw
@@ -201,12 +269,10 @@ function parseHours(text) {
     // without a leading day keyword. Examples:
     //   "food from 9am to 10pm", "kitchen open 11am-10pm",
     //   "serving 9am - 10pm", "grill hours: 9am-10pm"
-    const combinedHintRe =
-      /\b(?:grill|kitchen|food|hot\s+food|dining|serving|seating|taking\s+orders?)\s+(?:hours?[:\s]+|opens?\s*(?:(?:at|from)\s+)?|from\s+|available\s+(?:from\s+)?|service[:\s]+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon)\s*(?:–|-|to|until|till)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|midnight|noon)/gi;
-
+    COMBINED_HINT_RE.lastIndex = 0;
     let foundCombined = false;
     let cMatch;
-    while ((cMatch = combinedHintRe.exec(line)) !== null) {
+    while ((cMatch = COMBINED_HINT_RE.exec(line)) !== null) {
       const open = parseTime(cMatch[1]);
       const close = parseTime(cMatch[2]);
       if (open == null || close == null) continue;
@@ -230,11 +296,9 @@ function parseHours(text) {
     if (!foundCombined) {
       // Opening-only hints: "kitchen opens at 9am", "food from 9am",
       //                     "serving starts at 11am", "grill available from 9am"
-      const openingHintRe =
-        /\b(?:grill|kitchen|food|hot\s+food|dining|serving|seating|taking\s+orders?)\s+(?:opens?\s*(?:at|from)?\s*|starts?\s*(?:at|from)?\s*|(?:is\s+)?available\s+(?:from\s+|starting\s+)?|from\s+)(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon)/gi;
-
+      OPENING_HINT_RE.lastIndex = 0;
       let oMatch;
-      while ((oMatch = openingHintRe.exec(line)) !== null) {
+      while ((oMatch = OPENING_HINT_RE.exec(line)) !== null) {
         const open = parseTime(oMatch[1]);
         if (open == null) continue;
         inFoodSection = true;
@@ -243,11 +307,9 @@ function parseHours(text) {
 
       // Closing-only hints: "food until 10pm", "kitchen closes at 9pm",
       //                     "serving until 2am", "seating until midnight"
-      const closingHintRe =
-        /\b(?:grill|kitchen|food|hot\s+food|dining|serving|seating|taking\s+orders?|last\s+(?:food\s+)?orders?)\s+(?:close[sd]?\s+at|(?:is\s+)?(?:available\s+)?until|'?til|till|ends?\s+at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|midnight|noon)/gi;
-
+      CLOSING_HINT_RE.lastIndex = 0;
       let hint;
-      while ((hint = closingHintRe.exec(line)) !== null) {
+      while ((hint = CLOSING_HINT_RE.exec(line)) !== null) {
         const close = parseTime(hint[1]);
         if (close == null) continue;
         inFoodSection = true;
