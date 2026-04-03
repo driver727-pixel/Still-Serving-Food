@@ -229,6 +229,16 @@ app.get('/api/search', async (req, res) => {
       { location: location || '', name: name || '', servingUntil: servingUntil || '' },
       { limit: parseInt(limit, 10) || 10 },
     );
+
+    // Sort order: regular venues first (serving before not-serving), 24-hour chains last.
+    // 24-hr establishments are well-known, so regular results get priority placement
+    // while 24-hr venues still appear for completeness.
+    venues.sort((a, b) => {
+      if (a.is24Hours !== b.is24Hours) return a.is24Hours ? 1 : -1;
+      if (a.serving !== b.serving) return a.serving ? -1 : 1;
+      return 0;
+    });
+
     venueStore.set(cacheKey, venues);
     incrementSearchCount(ip);
     return res.json({ venues, fromCache: false });

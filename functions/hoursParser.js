@@ -28,6 +28,10 @@ const DAY_ALIASES = {
 const FOOD_SECTION_KEYWORDS = [
   'grill', 'kitchen', 'food', 'dining', 'lunch', 'dinner', 'breakfast',
   'brunch', 'menu', 'serving', 'hot food', 'last orders food',
+  'delivery', 'pickup', 'take-out', 'takeout', 'carry-out', 'carryout',
+  'to go', 'drive-thru', 'seating', 'taking orders', 'grill hours',
+  'food hours', 'serving hours', 'hot food hours', 'delivery hours',
+  'pickup hours',
 ];
 
 /**
@@ -89,11 +93,34 @@ function expandDayRange(raw) {
 }
 
 /**
+ * Detect whether the text indicates 24-hour food service.
+ * Matches common phrases found on Yelp, Facebook, and restaurant websites.
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+function detect24Hours(text) {
+  if (!text || typeof text !== 'string') return false;
+  const lower = text.toLowerCase();
+  return (
+    /\bopen\s+24\s*(?:hours?|hrs?)\b/.test(lower) ||
+    /\b24\s*(?:hours?|hrs?)\s+a\s+day\b/.test(lower) ||
+    /\b24\/7\b/.test(lower) ||
+    /\b24-hour\b/.test(lower) ||
+    /\balways\s+open\b/.test(lower) ||
+    /\bopen\s+around\s+the\s+clock\b/.test(lower) ||
+    /\bnever\s+close[sd]?\b/.test(lower)
+  );
+}
+
+/**
  * Extract all food-relevant hour blocks from a block of text.
  *
  * @param {string} text - Raw text scraped from a venue page
- * @returns {Array<{day: number, open: number, close: number, label: string}>}
- *   day = 0-6 (Sun-Sat), open/close = minutes since midnight
+ * @returns {Array<{day: number, open: number, close: number, label: string, inFoodSection: boolean, fromClosingHint?: boolean}>}
+ *   day = 0-6 (Sun-Sat), open/close = minutes since midnight.
+ *   fromClosingHint=true means the block was inferred from a "food until X" / "kitchen closes at X"
+ *   phrase where no explicit open time was stated; open defaults to 11:00 AM.
  */
 function parseHours(text) {
   if (!text || typeof text !== 'string') return [];
@@ -160,6 +187,33 @@ function parseHours(text) {
         });
       }
     }
+
+    // Detect phrases like "food until 10pm", "kitchen closes at 9", "serving until 2am",
+    // "seating until midnight", "grill closes at 10", "taking orders until 9pm".
+    // These provide a close time but no explicit open time; assume 11:00 AM as a
+    // reasonable kitchen-open default so isCurrentlyServing can still use them.
+    const closingHintRe =
+      /\b(?:grill|kitchen|food|hot\s+food|dining|serving|seating|taking\s+orders?|last\s+(?:food\s+)?orders?)\s+(?:close[sd]?\s+at|(?:is\s+)?(?:available\s+)?until|'?til|till|ends?\s+at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|midnight|noon)/gi;
+
+    let hint;
+    while ((hint = closingHintRe.exec(line)) !== null) {
+      const close = parseTime(hint[1]);
+      if (close == null) continue;
+
+      inFoodSection = true; // These lines are definitively about food service
+
+      // Apply as a daily block — the phrase doesn't specify particular days
+      for (let day = 0; day <= 6; day++) {
+        results.push({
+          day,
+          open: 11 * 60, // Reasonable default: assume kitchen opens at 11 AM
+          close,
+          label: DAYS[day],
+          inFoodSection: true,
+          fromClosingHint: true,
+        });
+      }
+    }
   }
 
   return results;
@@ -177,9 +231,21 @@ function isCurrentlyServing(hourBlocks, now = new Date()) {
   const dayOfWeek = now.getDay(); // 0=Sun … 6=Sat
   const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
 
-  // Prefer food-section blocks; fall back to general blocks if none found
-  const foodBlocks = hourBlocks.filter((b) => b.inFoodSection);
-  const blocks = foodBlocks.length ? foodBlocks : hourBlocks;
+  // Prefer food-section blocks; fall back to general blocks if none found.
+  // Closing-hint blocks (inferred from "food until X" phrases) are only used
+  // when no explicit hour ranges were found, to avoid overriding more accurate data.
+  const explicitFoodBlocks = hourBlocks.filter((b) => b.inFoodSection && !b.fromClosingHint);
+  const allExplicit = hourBlocks.filter((b) => !b.fromClosingHint);
+  const closingHints = hourBlocks.filter((b) => b.fromClosingHint);
+
+  let blocks;
+  if (explicitFoodBlocks.length) {
+    blocks = explicitFoodBlocks;
+  } else if (allExplicit.length) {
+    blocks = allExplicit;
+  } else {
+    blocks = closingHints;
+  }
 
   const todayBlocks = blocks.filter((b) => b.day === dayOfWeek);
 
@@ -233,4 +299,4 @@ function formatTime(minutes) {
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
-module.exports = { parseHours, isCurrentlyServing, formatTime, parseTime, expandDayRange };
+module.exports = { parseHours, isCurrentlyServing, formatTime, parseTime, expandDayRange, detect24Hours };

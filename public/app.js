@@ -214,22 +214,43 @@ function renderVenues(venues) {
     return;
   }
 
-  venues.forEach((venue) => {
+  const regularVenues = venues.filter((v) => !v.is24Hours);
+  const venues24Hr = venues.filter((v) => v.is24Hours);
+
+  regularVenues.forEach((venue) => {
     venueList.appendChild(buildCard(venue));
   });
+
+  if (venues24Hr.length > 0) {
+    const sep = document.createElement('div');
+    sep.className = 'chain-separator';
+    sep.innerHTML = '<span>24-Hour Establishments</span>';
+    venueList.appendChild(sep);
+    venues24Hr.forEach((venue) => {
+      venueList.appendChild(buildCard(venue));
+    });
+  }
 }
 
 function buildCard(venue) {
+  const is24Hours = venue.is24Hours === true;
   const serving = venue.serving;
   const hasHours = venue.hourBlocks && venue.hourBlocks.length > 0;
 
-  const statusClass = serving === true ? 'serving' : serving === false ? 'not-serving' : 'unknown';
-  const statusLabel =
-    serving === true
-      ? '🟢 Serving Food Now'
-      : serving === false
-        ? '🔴 Not Serving'
-        : '🟡 Hours Unknown';
+  let statusClass, statusLabel;
+  if (is24Hours) {
+    statusClass = 'serving';
+    statusLabel = '🕐 Open 24 Hours';
+  } else if (serving === true) {
+    statusClass = 'serving';
+    statusLabel = '🟢 Serving Food Now';
+  } else if (serving === false) {
+    statusClass = 'not-serving';
+    statusLabel = '🔴 Not Serving';
+  } else {
+    statusClass = 'unknown';
+    statusLabel = '🟡 Hours Unknown';
+  }
 
   const card = document.createElement('article');
   card.className = `venue-card ${statusClass}`;
@@ -244,20 +265,24 @@ function buildCard(venue) {
   let hoursTableHtml = '';
   if (hasHours) {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const rows = venue.hourBlocks
-      .map(
-        (b) =>
-          `<tr><td>${days[b.day]}</td><td>${minsToTime(b.open)}</td><td>${minsToTime(b.close)}</td></tr>`,
-      )
-      .join('');
-    hoursTableHtml = `
-      <details class="hours-detail">
-        <summary>Show all food hours</summary>
-        <table class="hours-table">
-          <thead><tr><th>Day</th><th>Opens</th><th>Closes</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </details>`;
+    // Only show explicit hour blocks in the table; skip closing-hint fallback rows.
+    const displayBlocks = venue.hourBlocks.filter((b) => !b.fromClosingHint);
+    if (displayBlocks.length) {
+      const rows = displayBlocks
+        .map(
+          (b) =>
+            `<tr><td>${days[b.day]}</td><td>${minsToTime(b.open)}</td><td>${minsToTime(b.close)}</td></tr>`,
+        )
+        .join('');
+      hoursTableHtml = `
+        <details class="hours-detail">
+          <summary>Show all food hours</summary>
+          <table class="hours-table">
+            <thead><tr><th>Day</th><th>Opens</th><th>Closes</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </details>`;
+    }
   }
 
   const urlHtml = venue.url
