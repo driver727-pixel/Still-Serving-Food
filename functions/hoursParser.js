@@ -28,7 +28,79 @@ const DAY_ALIASES = {
 const FOOD_SECTION_KEYWORDS = [
   'grill', 'kitchen', 'food', 'dining', 'lunch', 'dinner', 'breakfast',
   'brunch', 'menu', 'serving', 'hot food', 'last orders food',
+  'delivery', 'pickup', 'take-out', 'takeout', 'carry-out', 'carryout',
+  'to go', 'drive-thru', 'seating', 'taking orders', 'grill hours',
+  'food hours', 'serving hours', 'hot food hours', 'delivery hours',
+  'pickup hours',
 ];
+
+/**
+ * Regex alternation matching the food-service keywords used in the hint
+ * patterns below. Kept as a constant so the set of recognised keywords stays
+ * consistent across all three hint regexes.
+ *
+ * Includes "last orders?" because phrases like "last food orders at 9pm" are
+ * common on UK pub/restaurant websites.
+ */
+const FOOD_KW = '(?:grill|kitchen|food|hot\\s+food|dining|serving|seating|taking\\s+orders?|last\\s+(?:food\\s+)?orders?)';
+
+/** Matches any 12/24-hour clock time with optional am/pm, e.g. "9pm", "11:30 am", "23:00". */
+const TIME_RE = '\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?';
+
+/** Matches named close times. */
+const NAMED_TIME_RE = `(?:${TIME_RE}|midnight|noon)`;
+
+/**
+ * Pre-built RegExp objects for the three hint pattern categories.
+ * Using new RegExp() lets us compose them from the shared constants above.
+ */
+
+/**
+ * Matches a food-service open AND close time on the same line without a
+ * day-of-week prefix. The qualifier group (hours/opens/from/available) is
+ * optional so bare "serving 9am-10pm" also matches.
+ *
+ * Examples: "food from 9am to 10pm", "kitchen open 11am-10pm",
+ *           "serving 9am - 10pm", "grill hours: 9am-10pm"
+ */
+const COMBINED_HINT_RE = new RegExp(
+  `\\b${FOOD_KW}\\s+` +
+  // optional qualifier: "hours:", "opens at", "from", "available from", "service:"
+  `(?:hours?[:\\s]+|opens?\\s*(?:(?:at|from)\\s+)?|from\\s+|available\\s+(?:from\\s+)?|service[:\\s]+)?` +
+  `(${TIME_RE}|noon)` +                          // group 1: open time
+  `\\s*(?:–|-|to|until|till)\\s*` +              // separator
+  `(${NAMED_TIME_RE})`,                          // group 2: close time
+  'gi',
+);
+
+/**
+ * Matches an opening-only food-service time (no explicit close time).
+ *
+ * Examples: "kitchen opens at 9am", "food from 9am",
+ *           "serving starts at 11am", "grill available from 9am"
+ */
+const OPENING_HINT_RE = new RegExp(
+  `\\b${FOOD_KW}\\s+` +
+  // qualifier that signals an opening: opens/starts/available from/from
+  `(?:opens?\\s*(?:at|from)?\\s*|starts?\\s*(?:at|from)?\\s*|(?:is\\s+)?available\\s+(?:from\\s+|starting\\s+)?|from\\s+)` +
+  `(${TIME_RE}|noon)`,                           // group 1: open time
+  'gi',
+);
+
+/**
+ * Matches a closing-only food-service time (no explicit open time).
+ *
+ * Examples: "food until 10pm", "kitchen closes at 9pm",
+ *           "serving until 2am", "seating until midnight",
+ *           "taking orders until 9pm", "last food orders at 10pm"
+ */
+const CLOSING_HINT_RE = new RegExp(
+  `\\b${FOOD_KW}\\s+` +
+  // qualifier that signals a closing: closes at / until / till / ends at
+  `(?:close[sd]?\\s+at|(?:is\\s+)?(?:available\\s+)?until|'?til|till|ends?\\s+at)\\s+` +
+  `(${NAMED_TIME_RE})`,                          // group 1: close time
+  'gi',
+);
 
 /**
  * Convert a 12-hour time string ("11:30 pm", "2am", "midnight") into minutes
@@ -89,11 +161,36 @@ function expandDayRange(raw) {
 }
 
 /**
+ * Detect whether the text indicates 24-hour food service.
+ * Matches common phrases found on Yelp, Facebook, and restaurant websites.
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+function detect24Hours(text) {
+  if (!text || typeof text !== 'string') return false;
+  const lower = text.toLowerCase();
+  return (
+    /\bopen\s+24\s*(?:hours?|hrs?)\b/.test(lower) ||
+    /\b24\s*(?:hours?|hrs?)\s+a\s+day\b/.test(lower) ||
+    /\b24\/7\b/.test(lower) ||
+    /\b24-hour\b/.test(lower) ||
+    /\balways\s+open\b/.test(lower) ||
+    /\bopen\s+around\s+the\s+clock\b/.test(lower) ||
+    /\bnever\s+close[sd]?\b/.test(lower)
+  );
+}
+
+/**
  * Extract all food-relevant hour blocks from a block of text.
  *
  * @param {string} text - Raw text scraped from a venue page
- * @returns {Array<{day: number, open: number, close: number, label: string}>}
- *   day = 0-6 (Sun-Sat), open/close = minutes since midnight
+ * @returns {Array<{day: number, open: number, close: number, label: string, inFoodSection: boolean, fromHint?: boolean}>}
+ *   day = 0-6 (Sun-Sat), open/close = minutes since midnight.
+ *   fromHint=true means the block was inferred from an opening/closing hint phrase
+ *   ("food until X", "kitchen opens at X", "food from X to Y") rather than an
+ *   explicit day+time-range line. These blocks are only used as a fallback when no
+ *   explicit structured ranges are found.
  */
 function parseHours(text) {
   if (!text || typeof text !== 'string') return [];
@@ -103,6 +200,13 @@ function parseHours(text) {
 
   // We track whether we are inside a food-service section
   let inFoodSection = false;
+
+  // Opening/closing times extracted from single-sided hint phrases.
+  // These are collected across all lines and combined into daily blocks
+  // at the end so that e.g. "Kitchen opens at 9am" (line 1) and
+  // "Food until 10pm" (line 2) are correctly paired as 9am–10pm.
+  const pendingOpenHints = [];
+  const pendingCloseHints = [];
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -160,6 +264,77 @@ function parseHours(text) {
         });
       }
     }
+
+    // Combined food-service hint: both open AND close time on the same line,
+    // without a leading day keyword. Examples:
+    //   "food from 9am to 10pm", "kitchen open 11am-10pm",
+    //   "serving 9am - 10pm", "grill hours: 9am-10pm"
+    COMBINED_HINT_RE.lastIndex = 0;
+    let foundCombined = false;
+    let cMatch;
+    while ((cMatch = COMBINED_HINT_RE.exec(line)) !== null) {
+      const open = parseTime(cMatch[1]);
+      const close = parseTime(cMatch[2]);
+      if (open == null || close == null) continue;
+
+      inFoodSection = true;
+      foundCombined = true;
+      for (let day = 0; day <= 6; day++) {
+        results.push({
+          day,
+          open,
+          close,
+          label: DAYS[day],
+          inFoodSection: true,
+          fromHint: true,
+        });
+      }
+    }
+
+    // Only check single-sided hints when no combined match was found on this line,
+    // to avoid double-counting a line that already produced a full open+close block.
+    if (!foundCombined) {
+      // Opening-only hints: "kitchen opens at 9am", "food from 9am",
+      //                     "serving starts at 11am", "grill available from 9am"
+      OPENING_HINT_RE.lastIndex = 0;
+      let oMatch;
+      while ((oMatch = OPENING_HINT_RE.exec(line)) !== null) {
+        const open = parseTime(oMatch[1]);
+        if (open == null) continue;
+        inFoodSection = true;
+        pendingOpenHints.push(open);
+      }
+
+      // Closing-only hints: "food until 10pm", "kitchen closes at 9pm",
+      //                     "serving until 2am", "seating until midnight"
+      CLOSING_HINT_RE.lastIndex = 0;
+      let hint;
+      while ((hint = CLOSING_HINT_RE.exec(line)) !== null) {
+        const close = parseTime(hint[1]);
+        if (close == null) continue;
+        inFoodSection = true;
+        pendingCloseHints.push(close);
+      }
+    }
+  }
+
+  // Pair up accumulated opening and closing hints to form daily fallback blocks.
+  // When only one side is known, use a sensible default for the other:
+  //   - Opening hint only  → close defaults to 10:00 PM
+  //   - Closing hint only  → open  defaults to 11:00 AM
+  if (pendingOpenHints.length > 0 || pendingCloseHints.length > 0) {
+    const open = pendingOpenHints.length > 0 ? Math.min(...pendingOpenHints) : 11 * 60;
+    const close = pendingCloseHints.length > 0 ? Math.max(...pendingCloseHints) : 22 * 60;
+    for (let day = 0; day <= 6; day++) {
+      results.push({
+        day,
+        open,
+        close,
+        label: DAYS[day],
+        inFoodSection: true,
+        fromHint: true,
+      });
+    }
   }
 
   return results;
@@ -177,9 +352,21 @@ function isCurrentlyServing(hourBlocks, now = new Date()) {
   const dayOfWeek = now.getDay(); // 0=Sun … 6=Sat
   const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
 
-  // Prefer food-section blocks; fall back to general blocks if none found
-  const foodBlocks = hourBlocks.filter((b) => b.inFoodSection);
-  const blocks = foodBlocks.length ? foodBlocks : hourBlocks;
+  // Prefer food-section blocks; fall back to general blocks if none found.
+  // Hint blocks (inferred from opening/closing hint phrases) are only used
+  // when no explicit hour ranges were found, to avoid overriding more accurate data.
+  const explicitFoodBlocks = hourBlocks.filter((b) => b.inFoodSection && !b.fromHint);
+  const allExplicit = hourBlocks.filter((b) => !b.fromHint);
+  const hintBlocks = hourBlocks.filter((b) => b.fromHint);
+
+  let blocks;
+  if (explicitFoodBlocks.length) {
+    blocks = explicitFoodBlocks;
+  } else if (allExplicit.length) {
+    blocks = allExplicit;
+  } else {
+    blocks = hintBlocks;
+  }
 
   const todayBlocks = blocks.filter((b) => b.day === dayOfWeek);
 
@@ -233,4 +420,4 @@ function formatTime(minutes) {
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
-module.exports = { parseHours, isCurrentlyServing, formatTime, parseTime, expandDayRange };
+module.exports = { parseHours, isCurrentlyServing, formatTime, parseTime, expandDayRange, detect24Hours };

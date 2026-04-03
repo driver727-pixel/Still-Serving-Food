@@ -64,6 +64,38 @@ describe('buildVenue', () => {
     const venue = buildVenue(raw);
     expect(venue.description).toBe('A great pub');
   });
+
+  test('sets is24Hours to false by default', () => {
+    const raw = {
+      url: 'https://example.com',
+      metadata: { title: 'Regular Pub' },
+      markdown: 'Mon-Fri 12pm-9pm',
+    };
+    const venue = buildVenue(raw);
+    expect(venue.is24Hours).toBe(false);
+  });
+
+  test('sets is24Hours to true when content says "open 24 hours"', () => {
+    const raw = {
+      url: 'https://dennys.com',
+      metadata: { title: "Denny's" },
+      markdown: "We're open 24 hours a day, 7 days a week.",
+    };
+    const venue = buildVenue(raw);
+    expect(venue.is24Hours).toBe(true);
+    expect(venue.serving).toBe(true);
+  });
+
+  test('sets is24Hours to true when content contains "24/7"', () => {
+    const raw = {
+      url: 'https://mcdonalds.com',
+      metadata: { title: "McDonald's" },
+      markdown: 'Hot food available 24/7 at this location.',
+    };
+    const venue = buildVenue(raw);
+    expect(venue.is24Hours).toBe(true);
+    expect(venue.serving).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

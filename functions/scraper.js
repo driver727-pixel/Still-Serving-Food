@@ -10,7 +10,7 @@
  */
 
 const FirecrawlApp = require('@mendable/firecrawl-js').default;
-const { parseHours, isCurrentlyServing, formatTime } = require('./hoursParser');
+const { parseHours, isCurrentlyServing, formatTime, detect24Hours } = require('./hoursParser');
 
 /**
  * Build and return a Firecrawl client.
@@ -23,6 +23,8 @@ function buildClient(apiKey) {
 
 /**
  * Build a search query string from the given search parameters.
+ * The query is structured to surface actual restaurant / bar pages
+ * (including Yelp and Facebook listings) rather than "Top 10" listicle articles.
  * @param {object} params
  * @param {string} [params.location]
  * @param {string} [params.name]
@@ -30,7 +32,7 @@ function buildClient(apiKey) {
  * @returns {string}
  */
 function buildQuery(params = {}) {
-  const parts = ['bars restaurants grill food hours'];
+  const parts = [];
 
   if (params.name && params.name.trim()) {
     parts.push(`"${params.name.trim()}"`);
@@ -39,6 +41,21 @@ function buildQuery(params = {}) {
   if (params.location && params.location.trim()) {
     parts.push(`"${params.location.trim()}"`);
   }
+
+  // Use specific food-service-hours phrases that appear on actual restaurant
+  // pages, Yelp listings, and Facebook pages — not in "Top 10" listicle articles.
+  const foodHoursPhrases = [
+    '"food hours"',
+    '"kitchen hours"',
+    '"grill hours"',
+    '"serving hours"',
+    '"hot food hours"',
+    '"open 24 hours"',
+    '"24/7"',
+    '"delivery hours"',
+    '"pickup hours"',
+  ];
+  parts.push(`restaurant ${foodHoursPhrases.join(' OR ')}`);
 
   if (params.servingUntil && params.servingUntil.trim()) {
     parts.push(`serving until ${params.servingUntil.trim()}`);
@@ -129,8 +146,13 @@ async function scrapeVenue(url, options = {}) {
  */
 function buildVenue(raw) {
   const text = [raw.markdown || '', raw.content || '', raw.description || ''].join('\n');
+  const is24Hours = detect24Hours(text);
   const hourBlocks = parseHours(text);
-  const status = isCurrentlyServing(hourBlocks);
+
+  // 24-hour establishments are always serving; skip the time-window check.
+  const status = is24Hours
+    ? { serving: true, opensAt: null, closesAt: null }
+    : isCurrentlyServing(hourBlocks);
 
   // Derive a display name: prefer metadata title, fall back to hostname
   let name = raw.metadata?.title || raw.title || '';
@@ -148,6 +170,7 @@ function buildVenue(raw) {
     url: raw.url || '',
     description: raw.metadata?.description || raw.description || '',
     hourBlocks,
+    is24Hours,
     serving: status.serving,
     opensAt: status.opensAt != null ? formatTime(status.opensAt) : null,
     closesAt: status.closesAt != null ? formatTime(status.closesAt) : null,

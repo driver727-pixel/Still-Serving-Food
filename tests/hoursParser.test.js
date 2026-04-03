@@ -6,6 +6,7 @@ const {
   isCurrentlyServing,
   formatTime,
   expandDayRange,
+  detect24Hours,
 } = require('../functions/hoursParser');
 
 // ---------------------------------------------------------------------------
@@ -209,5 +210,171 @@ describe('formatTime', () => {
 
   test('handles times past 24:00 (next-day wrap)', () => {
     expect(formatTime(25 * 60)).toBe('1:00 AM');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detect24Hours
+// ---------------------------------------------------------------------------
+describe('detect24Hours', () => {
+  test('detects "open 24 hours"', () => {
+    expect(detect24Hours('We are open 24 hours a day.')).toBe(true);
+    expect(detect24Hours('Open 24 hours!')).toBe(true);
+  });
+
+  test('detects "24/7"', () => {
+    expect(detect24Hours('We serve food 24/7.')).toBe(true);
+  });
+
+  test('detects "24-hour"', () => {
+    expect(detect24Hours('Visit our 24-hour diner anytime.')).toBe(true);
+  });
+
+  test('detects "always open"', () => {
+    expect(detect24Hours('We are always open for you.')).toBe(true);
+  });
+
+  test('detects "open around the clock"', () => {
+    expect(detect24Hours('Hot food available open around the clock.')).toBe(true);
+  });
+
+  test('detects "never closes"', () => {
+    expect(detect24Hours('This location never closes.')).toBe(true);
+  });
+
+  test('returns false for normal restaurant text', () => {
+    expect(detect24Hours('Mon-Fri 12pm-9pm')).toBe(false);
+    expect(detect24Hours('Kitchen hours: 11am to 10pm')).toBe(false);
+  });
+
+  test('returns false for empty or null input', () => {
+    expect(detect24Hours('')).toBe(false);
+    expect(detect24Hours(null)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseHours — hint patterns (opening, closing, combined)
+// ---------------------------------------------------------------------------
+describe('parseHours hint patterns', () => {
+  // ----- closing-only hints -----
+  test('parses "food until 10pm" as daily hint blocks', () => {
+    const blocks = parseHours('food until 10pm');
+    expect(blocks.length).toBe(7); // one per day
+    expect(blocks[0].close).toBe(22 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+    expect(blocks[0].inFoodSection).toBe(true);
+  });
+
+  test('parses "kitchen closes at 9pm" as daily hint blocks', () => {
+    const blocks = parseHours('kitchen closes at 9pm');
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].close).toBe(21 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  test('parses "serving until midnight" as daily hint blocks', () => {
+    const blocks = parseHours('serving until midnight');
+    const closes = blocks.map((b) => b.close);
+    expect(closes.every((c) => c === 24 * 60)).toBe(true);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  test('closing-only hint defaults open to 11:00 AM', () => {
+    const blocks = parseHours('grill closes at 10pm');
+    expect(blocks[0].open).toBe(11 * 60);
+  });
+
+  // ----- opening-only hints -----
+  test('parses "kitchen opens at 9am" as daily hint blocks', () => {
+    const blocks = parseHours('kitchen opens at 9am');
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].open).toBe(9 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+    expect(blocks[0].inFoodSection).toBe(true);
+  });
+
+  test('parses "food from 9am" (no close) as daily hint blocks', () => {
+    const blocks = parseHours('food from 9am');
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].open).toBe(9 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  test('parses "serving starts at 11am" as daily hint blocks', () => {
+    const blocks = parseHours('serving starts at 11am');
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].open).toBe(11 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  test('opening-only hint defaults close to 10:00 PM', () => {
+    const blocks = parseHours('kitchen opens at 9am');
+    expect(blocks[0].close).toBe(22 * 60);
+  });
+
+  // ----- combined hint (open + close on same line) -----
+  test('parses "food from 9am to 10pm" as daily hint blocks', () => {
+    const blocks = parseHours('food from 9am to 10pm');
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].open).toBe(9 * 60);
+    expect(blocks[0].close).toBe(22 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  test('parses "kitchen open 11am-10pm" as daily hint blocks', () => {
+    const blocks = parseHours('kitchen open 11am-10pm');
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].open).toBe(11 * 60);
+    expect(blocks[0].close).toBe(22 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  test('parses "grill hours: 9am-10pm" as daily hint blocks', () => {
+    const blocks = parseHours('grill hours: 9am-10pm');
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].open).toBe(9 * 60);
+    expect(blocks[0].close).toBe(22 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  // ----- cross-line pairing -----
+  test('pairs opening and closing hints from separate lines', () => {
+    const text = 'Kitchen opens at 9am\nFood until 10pm';
+    const blocks = parseHours(text);
+    expect(blocks.length).toBe(7);
+    expect(blocks[0].open).toBe(9 * 60);
+    expect(blocks[0].close).toBe(22 * 60);
+    expect(blocks[0].fromHint).toBe(true);
+  });
+
+  test('uses earliest open hint when multiple opening hints exist', () => {
+    const text = 'Food from 9am\nServing starts at 11am';
+    const blocks = parseHours(text);
+    expect(blocks[0].open).toBe(9 * 60); // min of 9am and 11am
+  });
+
+  test('uses latest close hint when multiple closing hints exist', () => {
+    const text = 'Food until 9pm\nGrill closes at 10pm';
+    const blocks = parseHours(text);
+    expect(blocks[0].close).toBe(22 * 60); // max of 9pm and 10pm
+  });
+
+  // ----- priority over hints -----
+  test('explicit blocks take priority over hints in isCurrentlyServing', () => {
+    // Explicit block: Mon 12pm-9pm
+    const explicit = { day: 1, open: 12 * 60, close: 21 * 60, label: 'monday', inFoodSection: true };
+    // Hint block for every day closing at midnight
+    const hint = { day: 1, open: 11 * 60, close: 24 * 60, label: 'monday', inFoodSection: true, fromHint: true };
+
+    // At Monday 10pm (after explicit close, before hint close)
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay() + 1); // set to Monday
+    d.setHours(22, 0, 0, 0);
+
+    // With only the hint, should report serving (22:00 < 24:00)
+    expect(isCurrentlyServing([hint], d).serving).toBe(true);
+    // With both, explicit block wins and 22:00 is past 21:00 close → not serving
+    expect(isCurrentlyServing([explicit, hint], d).serving).toBe(false);
   });
 });
