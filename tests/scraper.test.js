@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildVenue, searchVenues, scrapeVenue } = require('../functions/scraper');
+const { buildVenue, searchVenues, scrapeVenue, isVenueRelevant, buildQuery } = require('../functions/scraper');
 
 describe('buildVenue', () => {
   test('derives name from metadata title', () => {
@@ -96,6 +96,177 @@ describe('buildVenue', () => {
     expect(venue.is24Hours).toBe(true);
     expect(venue.serving).toBe(true);
   });
+
+  test('sets callForHours to true when content says "call for hours"', () => {
+    const raw = {
+      url: 'https://example.com',
+      metadata: { title: 'Sunset Bar & Grill' },
+      markdown: 'Please call for hours — we vary seasonally.',
+    };
+    const venue = buildVenue(raw);
+    expect(venue.callForHours).toBe(true);
+  });
+
+  test('sets callForHours to true when content mentions "serving late"', () => {
+    const raw = {
+      url: 'https://example.com',
+      metadata: { title: 'Night Owl Bar' },
+      markdown: 'We specialize in serving late night meals until 4am.',
+    };
+    const venue = buildVenue(raw);
+    expect(venue.callForHours).toBe(true);
+  });
+
+  test('sets callForHours to true when content says "open late"', () => {
+    const raw = {
+      url: 'https://example.com',
+      metadata: { title: 'Late Night Eats' },
+      markdown: 'We are open late on weekends.',
+    };
+    const venue = buildVenue(raw);
+    expect(venue.callForHours).toBe(true);
+  });
+
+  test('sets callForHours to false for standard venues', () => {
+    const raw = {
+      url: 'https://example.com',
+      metadata: { title: 'Regular Restaurant' },
+      markdown: 'Kitchen hours: Mon-Fri 12pm-9pm',
+    };
+    const venue = buildVenue(raw);
+    expect(venue.callForHours).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isVenueRelevant — filtering logic
+// ---------------------------------------------------------------------------
+describe('isVenueRelevant', () => {
+  test('accepts a standard restaurant page', () => {
+    const raw = {
+      url: 'https://myrestaurant.com',
+      metadata: { title: 'My Restaurant' },
+      markdown: 'Kitchen hours: Mon-Fri 12pm-9pm',
+    };
+    expect(isVenueRelevant(raw)).toBe(true);
+  });
+
+  test('accepts a Yelp individual business listing', () => {
+    const raw = {
+      url: 'https://yelp.com/biz/my-restaurant',
+      metadata: { title: 'My Restaurant - Yelp' },
+      markdown: 'Kitchen hours...',
+    };
+    expect(isVenueRelevant(raw)).toBe(true);
+  });
+
+  test('rejects Instagram post URLs', () => {
+    const raw = {
+      url: 'https://www.instagram.com/p/ABC123/',
+      metadata: { title: 'Photo post' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects Twitter status URLs', () => {
+    const raw = {
+      url: 'https://twitter.com/foodtruck/status/123456',
+      metadata: { title: 'Tweet' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects Yelp search-result pages', () => {
+    const raw = {
+      url: 'https://yelp.com/search?find_desc=restaurants',
+      metadata: { title: 'Restaurants near me - Yelp' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects TripAdvisor restaurant list pages', () => {
+    const raw = {
+      url: 'https://tripadvisor.com/Restaurants-g60763-New_York.html',
+      metadata: { title: 'Best Restaurants in New York - TripAdvisor' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects listicle URLs containing /top-10/', () => {
+    const raw = {
+      url: 'https://eater.com/top-10-restaurants-nyc',
+      metadata: { title: 'Top 10 Restaurants in NYC' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects pages advertising private events', () => {
+    const raw = {
+      url: 'https://events.com/venue',
+      metadata: { title: 'Event Venue' },
+      markdown: 'Perfect for private events and private catering.',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects bare hotel pages with no food-service language', () => {
+    const raw = {
+      url: 'https://marriott.com/hotel-downtown',
+      metadata: { title: 'Marriott Hotel Downtown' },
+      markdown: 'Luxury rooms and suites. Free Wi-Fi.',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('accepts hotel pages that mention a restaurant', () => {
+    const raw = {
+      url: 'https://hotel.com/dining',
+      metadata: { title: 'The Capital Hotel Restaurant' },
+      markdown: 'Fine dining at the hotel.',
+    };
+    expect(isVenueRelevant(raw)).toBe(true);
+  });
+
+  test('accepts hotel pages whose body mentions a kitchen / grill', () => {
+    const raw = {
+      url: 'https://hilton.com/hotel/dining',
+      metadata: { title: 'Hilton Inn & Suites' },
+      markdown: 'Our on-site grill is open daily from 7am to 10pm.',
+    };
+    expect(isVenueRelevant(raw)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildQuery — query construction
+// ---------------------------------------------------------------------------
+describe('buildQuery', () => {
+  test('includes quoted name and location', () => {
+    const q = buildQuery({ name: 'The Crown', location: 'Brooklyn, NY' });
+    expect(q).toContain('"The Crown"');
+    expect(q).toContain('"Brooklyn, NY"');
+  });
+
+  test('includes restaurant and food-truck venue types', () => {
+    const q = buildQuery({ location: 'Brooklyn, NY' });
+    expect(q).toMatch(/restaurant/i);
+    expect(q).toMatch(/"food truck"/i);
+  });
+
+  test('includes servingUntil phrase', () => {
+    const q = buildQuery({ location: 'Brooklyn, NY', servingUntil: '10pm' });
+    expect(q).toContain('serving until 10pm');
+  });
+
+  test('includes food-hours phrases', () => {
+    const q = buildQuery({ location: 'Brooklyn, NY' });
+    expect(q).toContain('"kitchen hours"');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -162,6 +333,37 @@ describe('searchVenues', () => {
 
     const venues = await searchVenues('Test City');
     expect(venues).toEqual([]);
+
+    delete FirecrawlApp.prototype.search;
+  });
+
+  test('filters out irrelevant results (listicle + social post) from search', async () => {
+    const FirecrawlApp = require('@mendable/firecrawl-js').default;
+    process.env.FIRECRAWL_API_KEY = 'fc-dummy';
+
+    FirecrawlApp.prototype.search = jest.fn().mockResolvedValue({
+      web: [
+        {
+          url: 'https://myrestaurant.com',
+          metadata: { title: 'My Restaurant' },
+          markdown: 'Kitchen hours: Mon-Fri 12pm-9pm',
+        },
+        {
+          url: 'https://eater.com/top-10-restaurants-nyc',
+          metadata: { title: 'Top 10 Restaurants in NYC' },
+          markdown: '',
+        },
+        {
+          url: 'https://www.instagram.com/p/ABC123/',
+          metadata: { title: 'Food photo post' },
+          markdown: '',
+        },
+      ],
+    });
+
+    const venues = await searchVenues({ location: 'Brooklyn, NY' });
+    expect(venues).toHaveLength(1);
+    expect(venues[0].name).toBe('My Restaurant');
 
     delete FirecrawlApp.prototype.search;
   });

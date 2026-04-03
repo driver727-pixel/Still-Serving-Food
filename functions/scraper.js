@@ -12,6 +12,73 @@
 const FirecrawlApp = require('@mendable/firecrawl-js').default;
 const { parseHours, isCurrentlyServing, formatTime, detect24Hours } = require('./hoursParser');
 
+// ---------------------------------------------------------------------------
+// Relevance filtering — keep only commercial restaurant/food-truck pages
+// ---------------------------------------------------------------------------
+
+/** Individual social media posts (not business pages). */
+const SOCIAL_POST_URL_RE = /instagram\.com\/p\/|twitter\.com\/[^/]+\/status\/|x\.com\/[^/]+\/status\//i;
+
+/** Aggregator search-result pages (not individual business listings). */
+const AGGREGATOR_SEARCH_URL_RE = /yelp\.com\/search|tripadvisor\.com\/Restaurants-g/i;
+
+/** Listicle / guide URL path segments. */
+const LISTICLE_URL_RE = /\/(top[-_]?\d+|best[-_]restaurants|things[-_]to[-_]do|food[-_]guide|where[-_]to[-_]eat)/i;
+
+/** Private-event / catering-only language in page content. */
+const PRIVATE_EVENT_RE = /\bprivate\s+(?:event|catering|party|parties)\b|\bcatering\s+only\b/i;
+
+/** Accommodation keywords in the page title (signals a hotel / inn / etc.). */
+const HOTEL_NAME_RE = /\b(hotel|inn|resort|motel|lodge|hostel|suites?|bed\s+(?:and|&)\s+breakfast|b\s*&?\s*b)\b/i;
+
+/** Food-service keywords that indicate a restaurant inside or alongside accommodation. */
+const FOOD_BUSINESS_RE = /\b(restaurant|food\s+truck|diner|cafe|caf[eé]|bistro|brasserie|grill|kitchen|pub|bar|eatery|pizzeria)\b/i;
+
+/**
+ * Return true only when the raw Firecrawl result looks like a commercial
+ * restaurant or food-truck business page.  Filters out:
+ *   - Individual social-media posts (Instagram /p/, Twitter /status/)
+ *   - Aggregator search-result pages (Yelp /search, TripAdvisor list pages)
+ *   - Listicle / "Top 10" guide pages
+ *   - Private-event / catering-only venues
+ *   - Bare accommodation pages with no food-service mention
+ * @param {object} raw  Raw Firecrawl result object
+ * @returns {boolean}
+ */
+function isVenueRelevant(raw) {
+  const url = raw.url || '';
+  const title = raw.metadata?.title || raw.title || '';
+  const text = [
+    raw.markdown || '',
+    raw.content || '',
+    raw.description || '',
+    raw.metadata?.description || '',
+  ].join('\n');
+
+  if (SOCIAL_POST_URL_RE.test(url)) return false;
+  if (AGGREGATOR_SEARCH_URL_RE.test(url)) return false;
+  if (LISTICLE_URL_RE.test(url)) return false;
+  if (PRIVATE_EVENT_RE.test(text)) return false;
+
+  // Drop pure accommodation pages that carry no food-service signals
+  if (HOTEL_NAME_RE.test(title) && !FOOD_BUSINESS_RE.test(title) && !FOOD_BUSINESS_RE.test(text)) {
+    return false;
+  }
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// "Call for hours" / late-service detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Phrases that indicate a venue's hours are uncertain or need confirmation,
+ * or that the venue is known for late-night / variable service.
+ */
+const CALL_FOR_HOURS_RE =
+  /\b(call\s+(?:ahead|us|for\s+hours?|to\s+confirm)|hours?\s+(?:vary|may\s+vary|are\s+seasonal)|seasonal\s+hours?|by\s+appointment|serving\s+late|late[\s-]night\s+(?:menu|service|hours?)|open\s+late)\b/i;
+
 /**
  * Build and return a Firecrawl client.
  * @param {string} apiKey
@@ -23,8 +90,9 @@ function buildClient(apiKey) {
 
 /**
  * Build a search query string from the given search parameters.
- * The query is structured to surface actual restaurant / bar pages
- * (including Yelp and Facebook listings) rather than "Top 10" listicle articles.
+ * The query targets commercial restaurant / food-truck business pages
+ * (including Yelp listings and Facebook business pages) and avoids
+ * "Top 10" listicle articles, hotel accommodation pages, and social posts.
  * @param {object} params
  * @param {string} [params.location]
  * @param {string} [params.name]
@@ -42,8 +110,22 @@ function buildQuery(params = {}) {
     parts.push(`"${params.location.trim()}"`);
   }
 
+  // Restrict to commercial food-service venue types so we avoid hotel
+  // accommodation pages, private-event spaces, and generic listicles.
+  const venueTypes = [
+    'restaurant',
+    '"food truck"',
+    'diner',
+    'cafe',
+    'bistro',
+    'pub',
+    'bar',
+    'grill',
+  ];
+  parts.push(`(${venueTypes.join(' OR ')})`);
+
   // Use specific food-service-hours phrases that appear on actual restaurant
-  // pages, Yelp listings, and Facebook pages — not in "Top 10" listicle articles.
+  // pages, Yelp listings, and Facebook business pages — not in listicle articles.
   const foodHoursPhrases = [
     '"food hours"',
     '"kitchen hours"',
@@ -55,7 +137,7 @@ function buildQuery(params = {}) {
     '"delivery hours"',
     '"pickup hours"',
   ];
-  parts.push(`restaurant ${foodHoursPhrases.join(' OR ')}`);
+  parts.push(`(${foodHoursPhrases.join(' OR ')})`);
 
   if (params.servingUntil && params.servingUntil.trim()) {
     parts.push(`serving until ${params.servingUntil.trim()}`);
@@ -107,7 +189,9 @@ async function searchVenues(searchParams, options = {}) {
     return [];
   }
 
-  const venues = searchResults.web.map((result) => buildVenue(result));
+  const venues = searchResults.web
+    .filter((result) => isVenueRelevant(result))
+    .map((result) => buildVenue(result));
   return venues;
 }
 
@@ -165,6 +249,10 @@ function buildVenue(raw) {
   }
   name = name.split(' | ')[0].split(' - ')[0].trim() || 'Unknown Venue';
 
+  // Detect "call for hours" / late-service language so the UI can surface
+  // a contact link prompting the user to reach out to confirm hours.
+  const callForHours = CALL_FOR_HOURS_RE.test(text);
+
   return {
     name,
     url: raw.url || '',
@@ -174,8 +262,9 @@ function buildVenue(raw) {
     serving: status.serving,
     opensAt: status.opensAt != null ? formatTime(status.opensAt) : null,
     closesAt: status.closesAt != null ? formatTime(status.closesAt) : null,
+    callForHours,
     scrapedAt: new Date().toISOString(),
   };
 }
 
-module.exports = { searchVenues, scrapeVenue, buildVenue };
+module.exports = { searchVenues, scrapeVenue, buildVenue, isVenueRelevant, buildQuery };
