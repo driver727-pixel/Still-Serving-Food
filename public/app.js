@@ -266,7 +266,7 @@ function buildCard(venue) {
   if (hasHours) {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     // Only show explicit hour blocks in the table; skip closing-hint fallback rows.
-    const displayBlocks = venue.hourBlocks.filter((b) => !b.fromClosingHint);
+    const displayBlocks = venue.hourBlocks.filter((b) => !b.fromHint);
     if (displayBlocks.length) {
       const rows = displayBlocks
         .map(
