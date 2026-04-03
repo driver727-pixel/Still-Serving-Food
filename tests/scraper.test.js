@@ -256,6 +256,10 @@ describe('buildQuery', () => {
     const q = buildQuery({ location: 'Brooklyn, NY' });
     expect(q).toMatch(/restaurant/i);
     expect(q).toMatch(/"food truck"/i);
+    expect(q).toMatch(/\bdiner\b/i);
+    expect(q).toMatch(/\bcafe\b/i);
+    expect(q).toMatch(/\bbar\b/i);
+    expect(q).toMatch(/\bgrill\b/i);
   });
 
   test('includes servingUntil phrase', () => {
