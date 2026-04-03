@@ -44,10 +44,18 @@ function buildQuery(params = {}) {
 
   // Use specific food-service-hours phrases that appear on actual restaurant
   // pages, Yelp listings, and Facebook pages — not in "Top 10" listicle articles.
-  parts.push(
-    'restaurant "food hours" OR "kitchen hours" OR "grill hours" OR "serving hours"' +
-    ' OR "hot food hours" OR "open 24 hours" OR "24/7" OR "delivery hours" OR "pickup hours"',
-  );
+  const foodHoursPhrases = [
+    '"food hours"',
+    '"kitchen hours"',
+    '"grill hours"',
+    '"serving hours"',
+    '"hot food hours"',
+    '"open 24 hours"',
+    '"24/7"',
+    '"delivery hours"',
+    '"pickup hours"',
+  ];
+  parts.push(`restaurant ${foodHoursPhrases.join(' OR ')}`);
 
   if (params.servingUntil && params.servingUntil.trim()) {
     parts.push(`serving until ${params.servingUntil.trim()}`);

@@ -235,7 +235,8 @@ app.get('/api/search', async (req, res) => {
     // while 24-hr venues still appear for completeness.
     venues.sort((a, b) => {
       if (a.is24Hours !== b.is24Hours) return a.is24Hours ? 1 : -1;
-      if (a.serving !== b.serving) return a.serving ? -1 : 1;
+      if (a.serving === true && b.serving !== true) return -1;
+      if (b.serving === true && a.serving !== true) return 1;
       return 0;
     });
 
