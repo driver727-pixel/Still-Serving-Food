@@ -249,7 +249,7 @@ function enrichVenuesWithFoursquareData(venues, fsqVenues) {
     }
 
     const combinedText = fsq.tipTexts.join('\n');
-    const is24Hours = detect24Hours(combinedText) || (hourBlocks.length === 0 && detect24Hours((fsq.hourBlocks || []).map(b => b.label || '').join(' ')));
+    const is24Hours = detect24Hours(combinedText);
 
     if (hourBlocks.length === 0 && !is24Hours) return venue;
     const status = is24Hours

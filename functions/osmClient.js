@@ -29,7 +29,7 @@ const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
  * Identifying User-Agent required by Nominatim's usage policy.
  * See https://operations.osmfoundation.org/policies/nominatim/
  */
-const USER_AGENT = 'StillServingFood/1.0 (https://letsnarf.com)';
+const USER_AGENT = 'Letsnarf/1.0 (https://letsnarf.com)';
 
 /** OSM amenity values that represent food/drink establishments. */
 const OSM_FOOD_AMENITIES = 'restaurant|bar|cafe|pub|fast_food|biergarten|food_court|ice_cream';
