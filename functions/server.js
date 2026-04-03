@@ -2,6 +2,7 @@
 
 require('dotenv').config();
 
+const crypto = require('crypto');
 const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');
@@ -36,7 +37,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Subscriber-Token');
   }
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -182,6 +183,7 @@ function checkRateLimit(store, ip, maxRequests, windowMs) {
 // Rate-limit stores for auth-sensitive endpoints
 const activateRateLimits = new Map();    // /api/activate — 10 per IP per hour
 const subscriberStatusLimits = new Map(); // /api/subscriber-status — 120 per IP per hour
+const searchRateLimits = new Map();       // /api/search — 60 per IP per hour (fresh searches)
 
 function verifySubscriberToken(token) {
   if (!token || typeof token !== 'string') return { valid: false };
@@ -198,6 +200,7 @@ function verifySubscriberToken(token) {
 app._subscriberSearches = subscriberSearches;
 app._activateRateLimits = activateRateLimits;
 app._subscriberStatusLimits = subscriberStatusLimits;
+app._searchRateLimits = searchRateLimits;
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -270,7 +273,10 @@ app.get('/api/search', async (req, res) => {
   const servingUntil = typeof req.query.servingUntil === 'string' ? req.query.servingUntil : '';
   const limit = typeof req.query.limit === 'string' ? req.query.limit : '';
   const adToken = typeof req.query.adToken === 'string' ? req.query.adToken : '';
-  const subscriberToken = typeof req.query.subscriberToken === 'string' ? req.query.subscriberToken : '';
+  // Subscriber token is sent in a request header to avoid appearing in server logs / history
+  const subscriberToken = typeof req.headers['x-subscriber-token'] === 'string'
+    ? req.headers['x-subscriber-token']
+    : '';
 
   // At least one search dimension must be provided
   const hasLocation = location.trim().length > 0;
@@ -296,6 +302,13 @@ app.get('/api/search', async (req, res) => {
   const subscriberResult = verifySubscriberToken(subscriberToken);
   const isSubscriber = subscriberResult.valid;
 
+  // Rate-limit fresh (non-cached) search requests — 60 per IP per hour.
+  // The cache check happens below; this limiter guards the Firecrawl API calls.
+  const searchIp = req.ip || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(searchRateLimits, searchIp, 60, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many searches. Please wait before trying again.' });
+  }
+
   if (isSubscriber) {
     const used = subscriberSearches.get(subscriberResult.subscriberId) || 0;
     if (used >= SUBSCRIBER_SEARCHES) {
@@ -320,10 +333,8 @@ app.get('/api/search', async (req, res) => {
   }
 
   // Ad-gate check — only applied to non-subscribers on fresh (non-cached) searches
-  let ip = null;
   if (!isSubscriber) {
-    ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const searchCount = getSearchCount(ip);
+    const searchCount = getSearchCount(searchIp);
     const needsAd = searchCount >= FREE_SEARCHES_PER_IP;
 
     if (needsAd) {
@@ -348,7 +359,7 @@ app.get('/api/search', async (req, res) => {
       const used = subscriberSearches.get(subscriberResult.subscriberId) || 0;
       subscriberSearches.set(subscriberResult.subscriberId, used + 1);
     } else {
-      incrementSearchCount(ip);
+      incrementSearchCount(searchIp);
     }
 
     return res.json({ venues, fromCache: false });
@@ -454,7 +465,7 @@ app.get('/api/activate', async (req, res) => {
     }
 
     // Generate a unique subscriber ID and mint a signed JWT.
-    const subscriberId = generateToken() + generateToken();
+    const subscriberId = crypto.randomUUID();
     subscriberSearches.set(subscriberId, 0);
 
     const token = jwt.sign(
@@ -481,7 +492,9 @@ app.get('/api/subscriber-status', (req, res) => {
     return res.status(429).json({ error: 'Too many requests. Please slow down.' });
   }
 
-  const token = typeof req.query.subscriberToken === 'string' ? req.query.subscriberToken : '';
+  const token = typeof req.headers['x-subscriber-token'] === 'string'
+    ? req.headers['x-subscriber-token']
+    : '';
   const result = verifySubscriberToken(token);
 
   if (!result.valid) {

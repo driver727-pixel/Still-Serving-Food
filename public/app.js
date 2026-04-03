@@ -73,7 +73,9 @@ async function refreshSubscriberUI() {
   }
 
   try {
-    const res = await fetch(`/api/subscriber-status?subscriberToken=${encodeURIComponent(token)}`);
+    const res = await fetch('/api/subscriber-status', {
+      headers: { 'X-Subscriber-Token': token },
+    });
     if (!res.ok) {
       clearSubscriberToken();
       showUpgradePrompt(true);
@@ -222,9 +224,12 @@ async function doSearch(params, adToken, subscriberToken) {
     if (params.location) qs.set('location', params.location);
     if (params.servingUntil) qs.set('servingUntil', params.servingUntil);
     if (adToken) qs.set('adToken', adToken);
-    if (subscriberToken) qs.set('subscriberToken', subscriberToken);
 
-    const res = await fetch(`/api/search?${qs.toString()}`);
+    const fetchHeaders = {};
+    // Send subscriber token in a header to keep it out of server access logs and browser history
+    if (subscriberToken) fetchHeaders['X-Subscriber-Token'] = subscriberToken;
+
+    const res = await fetch(`/api/search?${qs.toString()}`, { headers: fetchHeaders });
 
     if (res.status === 402) {
       const body = await res.json().catch(() => ({}));
@@ -233,7 +238,7 @@ async function doSearch(params, adToken, subscriberToken) {
         // Subscriber has exhausted their 100-search pass
         clearSubscriberToken();
         showUpgradePrompt(true);
-        showError('You\u2019ve used all your searches. Purchase another pass to continue.');
+        showError('You've used all your searches. Purchase another pass to continue.');
         return;
       }
 

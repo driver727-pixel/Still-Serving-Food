@@ -35,6 +35,7 @@ beforeEach(() => {
   app._subscriberSearches.clear();
   if (app._activateRateLimits) app._activateRateLimits.clear();
   if (app._subscriberStatusLimits) app._subscriberStatusLimits.clear();
+  if (app._searchRateLimits) app._searchRateLimits.clear();
   jest.clearAllMocks();
 });
 
@@ -326,15 +327,15 @@ describe('GET /api/subscriber-status', () => {
   });
 
   test('returns 401 for an invalid token', async () => {
-    const res = await request(app).get('/api/subscriber-status?subscriberToken=not-a-real-token');
+    const res = await request(app).get('/api/subscriber-status').set('X-Subscriber-Token', 'not-a-real-token');
     expect(res.status).toBe(401);
   });
 
   test('returns 401 for a token signed with the wrong secret', async () => {
     const token = makeSubscriberToken('sub-wrong-secret', 'wrong-secret');
-    const res = await request(app).get(
-      '/api/subscriber-status?subscriberToken=' + encodeURIComponent(token),
-    );
+    const res = await request(app)
+      .get('/api/subscriber-status')
+      .set('X-Subscriber-Token', token);
     expect(res.status).toBe(401);
   });
 
@@ -342,9 +343,9 @@ describe('GET /api/subscriber-status', () => {
     const subscriberId = 'sub-status-test';
     app._subscriberSearches.set(subscriberId, 10);
     const token = makeSubscriberToken(subscriberId);
-    const res = await request(app).get(
-      '/api/subscriber-status?subscriberToken=' + encodeURIComponent(token),
-    );
+    const res = await request(app)
+      .get('/api/subscriber-status')
+      .set('X-Subscriber-Token', token);
     expect(res.status).toBe(200);
     expect(res.body.searchesRemaining).toBe(90);
     expect(res.body.searchesTotal).toBe(100);
@@ -352,9 +353,9 @@ describe('GET /api/subscriber-status', () => {
 
   test('returns full quota for a subscriber not yet tracked in memory', async () => {
     const token = makeSubscriberToken('sub-new');
-    const res = await request(app).get(
-      '/api/subscriber-status?subscriberToken=' + encodeURIComponent(token),
-    );
+    const res = await request(app)
+      .get('/api/subscriber-status')
+      .set('X-Subscriber-Token', token);
     expect(res.status).toBe(200);
     expect(res.body.searchesRemaining).toBe(100);
   });
@@ -387,9 +388,9 @@ describe('GET /api/search — subscriber token', () => {
     app._subscriberSearches.set(subscriberId, 0);
     const token = makeSubscriberToken(subscriberId);
 
-    const res = await request(app).get(
-      '/api/search?location=CitySubscriberUnique&subscriberToken=' + encodeURIComponent(token),
-    );
+    const res = await request(app)
+      .get('/api/search?location=CitySubscriberUnique')
+      .set('X-Subscriber-Token', token);
     expect(res.status).toBe(200);
   });
 
@@ -400,9 +401,9 @@ describe('GET /api/search — subscriber token', () => {
     app._subscriberSearches.set(subscriberId, 0);
     const token = makeSubscriberToken(subscriberId);
 
-    await request(app).get(
-      '/api/search?location=CityIncrementTest&subscriberToken=' + encodeURIComponent(token),
-    );
+    await request(app)
+      .get('/api/search?location=CityIncrementTest')
+      .set('X-Subscriber-Token', token);
     expect(app._subscriberSearches.get(subscriberId)).toBe(1);
   });
 
@@ -414,15 +415,15 @@ describe('GET /api/search — subscriber token', () => {
     const token = makeSubscriberToken(subscriberId);
 
     // First request populates cache
-    await request(app).get(
-      '/api/search?location=CityCacheTest&subscriberToken=' + encodeURIComponent(token),
-    );
+    await request(app)
+      .get('/api/search?location=CityCacheTest')
+      .set('X-Subscriber-Token', token);
     const usedAfterFirst = app._subscriberSearches.get(subscriberId);
 
     // Second request hits cache
-    await request(app).get(
-      '/api/search?location=CityCacheTest&subscriberToken=' + encodeURIComponent(token),
-    );
+    await request(app)
+      .get('/api/search?location=CityCacheTest')
+      .set('X-Subscriber-Token', token);
     expect(app._subscriberSearches.get(subscriberId)).toBe(usedAfterFirst);
   });
 
@@ -433,9 +434,9 @@ describe('GET /api/search — subscriber token', () => {
     app._subscriberSearches.set(subscriberId, 100); // already used all 100
     const token = makeSubscriberToken(subscriberId);
 
-    const res = await request(app).get(
-      '/api/search?location=CityExhaustedTest&subscriberToken=' + encodeURIComponent(token),
-    );
+    const res = await request(app)
+      .get('/api/search?location=CityExhaustedTest')
+      .set('X-Subscriber-Token', token);
     expect(res.status).toBe(402);
     expect(res.body.error).toBe('search_limit_reached');
   });
