@@ -22,6 +22,16 @@ const SOCIAL_POST_URL_RE = /instagram\.com\/p\/|twitter\.com\/[^/]+\/status\/|x\
 /** Aggregator search-result pages (not individual business listings). */
 const AGGREGATOR_SEARCH_URL_RE = /yelp\.com\/search|tripadvisor\.com\/Restaurants-g/i;
 
+/**
+ * Link-aggregator pages (LinkTree, Taplink, Beacons.ai, etc.) that act as
+ * "hub" pages with links to a venue's real website, menu PDF, and social
+ * accounts.  When a search returns one of these, we attempt to follow the
+ * first plausible outbound link to a real venue website and scrape that
+ * instead, extracting hours from the actual source.
+ */
+const LINK_AGGREGATOR_RE =
+  /\b(?:linktr\.ee|taplink\.cc|beacons\.ai|lit\.link|allmylinks\.com|bio\.link|linkin\.bio|campsite\.bio|lnk\.bio|shor\.by)\b/i;
+
 /** Listicle / guide URL path segments. */
 const LISTICLE_URL_RE = /\/(top[-_]?\d+|best[-_]restaurants|things[-_]to[-_]do|food[-_]guide|where[-_]to[-_]eat)/i;
 
@@ -58,6 +68,9 @@ function isVenueRelevant(raw) {
   if (SOCIAL_POST_URL_RE.test(url)) return false;
   if (AGGREGATOR_SEARCH_URL_RE.test(url)) return false;
   if (LISTICLE_URL_RE.test(url)) return false;
+  // Link-aggregator hub pages contain no hours; they will be handled by
+  // maybeFollowLinkAggregator() after the initial venue list is built.
+  if (LINK_AGGREGATOR_RE.test(url)) return false;
   if (PRIVATE_EVENT_RE.test(text)) return false;
 
   // Drop pure accommodation pages that carry no food-service signals
@@ -86,6 +99,60 @@ const CALL_FOR_HOURS_RE =
  */
 function buildClient(apiKey) {
   return new FirecrawlApp({ apiKey });
+}
+
+/**
+ * Pattern matching outbound links that look like a real venue website
+ * (non-aggregator, non-social, non-aggregator-search).
+ * Used when following a link-aggregator hub page.
+ */
+const REAL_WEBSITE_RE =
+  /https?:\/\/(?!(?:www\.)?(?:facebook|instagram|twitter|x|tiktok|youtube|linktree|taplink|beacons|bio\.link|lnk\.bio|allmylinks|campsite|shor\.by|lit\.link|linkin\.bio)\.)[a-z0-9.-]+\.[a-z]{2,}/i;
+
+/**
+ * Given a raw Firecrawl result from a link-aggregator page (e.g. linktr.ee),
+ * try to extract the first plausible real-venue website URL from the links or
+ * the markdown text, then scrape that URL for food-service hours.
+ *
+ * Returns a new Venue built from the secondary page, or null if no suitable
+ * link is found or the secondary scrape fails.
+ *
+ * @param {object} raw          Raw Firecrawl result for the link-aggregator URL
+ * @param {FirecrawlApp} client Firecrawl client instance
+ * @returns {Promise<Venue|null>}
+ */
+async function maybeFollowLinkAggregator(raw, client) {
+  // Collect candidate URLs: structured links array first, then markdown text
+  const candidates = [];
+
+  const links = raw.links || [];
+  for (const link of links) {
+    const href = typeof link === 'string' ? link : link?.url;
+    if (href && REAL_WEBSITE_RE.test(href) && !LINK_AGGREGATOR_RE.test(href)) {
+      candidates.push(href);
+    }
+  }
+
+  if (candidates.length === 0) {
+    // Fall back to scanning markdown for embedded URLs
+    const text = raw.markdown || '';
+    const urlMatches = text.match(/https?:\/\/[^\s)>\]"']+/gi) || [];
+    for (const href of urlMatches) {
+      if (REAL_WEBSITE_RE.test(href) && !LINK_AGGREGATOR_RE.test(href)) {
+        candidates.push(href);
+      }
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  // Try to scrape the first candidate URL
+  try {
+    const result = await client.scrape(candidates[0], { formats: ['markdown'] });
+    return buildVenue({ url: candidates[0], ...result });
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -125,7 +192,9 @@ function buildQuery(params = {}) {
   parts.push(`(${venueTypes.join(' OR ')})`);
 
   // Use specific food-service-hours phrases that appear on actual restaurant
-  // pages, Yelp listings, and Facebook business pages — not in listicle articles.
+  // pages, Yelp listings, TripAdvisor restaurant pages, menu-aggregator sites
+  // (MenuPages, Allmenus, SinglePlatform), and Facebook business pages — not
+  // in listicle articles.
   const foodHoursPhrases = [
     '"food hours"',
     '"kitchen hours"',
@@ -189,9 +258,27 @@ async function searchVenues(searchParams, options = {}) {
     return [];
   }
 
-  const venues = searchResults.web
-    .filter((result) => isVenueRelevant(result))
-    .map((result) => buildVenue(result));
+  const rawResults = searchResults.web;
+  const regularResults = rawResults.filter((result) => isVenueRelevant(result));
+
+  // For link-aggregator pages returned by search, attempt to follow the
+  // first outbound link to the real venue website and extract hours there.
+  const aggregatorResults = rawResults.filter(
+    (result) => LINK_AGGREGATOR_RE.test(result.url || ''),
+  );
+
+  const venues = regularResults.map((result) => buildVenue(result));
+
+  // Process link-aggregator results concurrently (best-effort).
+  if (aggregatorResults.length > 0) {
+    const followed = await Promise.all(
+      aggregatorResults.map((raw) => maybeFollowLinkAggregator(raw, client).catch(() => null)),
+    );
+    for (const v of followed) {
+      if (v) venues.push(v);
+    }
+  }
+
   return venues;
 }
 
@@ -267,4 +354,4 @@ function buildVenue(raw) {
   };
 }
 
-module.exports = { searchVenues, scrapeVenue, buildVenue, isVenueRelevant, buildQuery };
+module.exports = { searchVenues, scrapeVenue, buildVenue, isVenueRelevant, buildQuery, maybeFollowLinkAggregator, LINK_AGGREGATOR_RE };

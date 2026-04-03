@@ -1,7 +1,12 @@
 'use strict';
 
 const https = require('https');
-const { searchPlaces, isFoodEstablishment } = require('../functions/placesClient');
+const {
+  searchPlaces,
+  isFoodEstablishment,
+  parseOpeningPeriods,
+  parseNewApiPeriods,
+} = require('../functions/placesClient');
 
 jest.mock('https');
 
@@ -233,4 +238,148 @@ test('respects limit parameter', async () => {
 
   const result = await searchPlaces({ location: 'Brooklyn', limit: 5, apiKey: 'key' });
   expect(result.length).toBeLessThanOrEqual(5);
+});
+
+
+// ---------------------------------------------------------------------------
+// parseOpeningPeriods
+// ---------------------------------------------------------------------------
+describe('parseOpeningPeriods', () => {
+  test('converts Legacy periods to HourBlocks', () => {
+    const periods = [
+      { open: { day: 1, time: '1200' }, close: { day: 1, time: '2200' } },
+      { open: { day: 5, time: '1100' }, close: { day: 5, time: '2300' } },
+    ];
+    const blocks = parseOpeningPeriods(periods);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].day).toBe(1);
+    expect(blocks[0].open).toBe(720);   // 12:00 → 720 min
+    expect(blocks[0].close).toBe(1320); // 22:00 → 1320 min
+    expect(blocks[0].label).toBe('monday');
+    expect(blocks[0].inFoodSection).toBe(false);
+    expect(blocks[1].day).toBe(5);
+    expect(blocks[1].open).toBe(660);
+    expect(blocks[1].close).toBe(1380);
+    expect(blocks[1].label).toBe('friday');
+  });
+
+  test('returns empty array for null input', () => {
+    expect(parseOpeningPeriods(null)).toEqual([]);
+  });
+
+  test('returns empty array for empty array input', () => {
+    expect(parseOpeningPeriods([])).toEqual([]);
+  });
+
+  test('skips periods missing open or close time', () => {
+    const periods = [
+      { open: { day: 1 }, close: { day: 1, time: '2200' } },
+      { open: { day: 2, time: '1200' } },
+    ];
+    expect(parseOpeningPeriods(periods)).toEqual([]);
+  });
+
+  test('parses midnight (0000) correctly', () => {
+    const periods = [
+      { open: { day: 0, time: '0000' }, close: { day: 0, time: '2359' } },
+    ];
+    const blocks = parseOpeningPeriods(periods);
+    expect(blocks[0].open).toBe(0);
+    expect(blocks[0].close).toBe(1439);
+  });
+
+  test('handles Sunday (day 0) correctly', () => {
+    const periods = [{ open: { day: 0, time: '1000' }, close: { day: 0, time: '2000' } }];
+    const blocks = parseOpeningPeriods(periods);
+    expect(blocks[0].day).toBe(0);
+    expect(blocks[0].label).toBe('sunday');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseNewApiPeriods
+// ---------------------------------------------------------------------------
+describe('parseNewApiPeriods', () => {
+  test('converts Places API (New) kitchen periods to HourBlocks with inFoodSection=true', () => {
+    const periods = [
+      { open: { day: 1, hour: 11, minute: 0 }, close: { day: 1, hour: 22, minute: 0 } },
+      { open: { day: 6, hour: 10, minute: 30 }, close: { day: 6, hour: 23, minute: 0 } },
+    ];
+    const blocks = parseNewApiPeriods(periods);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].day).toBe(1);
+    expect(blocks[0].open).toBe(660);
+    expect(blocks[0].close).toBe(1320);
+    expect(blocks[0].inFoodSection).toBe(true);
+    expect(blocks[1].day).toBe(6);
+    expect(blocks[1].open).toBe(630); // 10:30 → 630 min
+    expect(blocks[1].close).toBe(1380);
+  });
+
+  test('defaults minute to 0 when not provided', () => {
+    const periods = [{ open: { day: 2, hour: 9 }, close: { day: 2, hour: 21 } }];
+    const blocks = parseNewApiPeriods(periods);
+    expect(blocks[0].open).toBe(540);
+    expect(blocks[0].close).toBe(1260);
+  });
+
+  test('returns empty array for null input', () => {
+    expect(parseNewApiPeriods(null)).toEqual([]);
+  });
+
+  test('skips periods missing hour fields', () => {
+    const periods = [{ open: { day: 1 }, close: { day: 1, hour: 22 } }];
+    expect(parseNewApiPeriods(periods)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// searchPlaces — openingHours and kitchenHours fields
+// ---------------------------------------------------------------------------
+test('includes openingHours from Legacy Place Details when periods are present', async () => {
+  const textSearchWithOne = {
+    status: 'OK',
+    results: [{ place_id: 'place_abc', types: ['restaurant'] }],
+  };
+  const detailsWithHours = {
+    status: 'OK',
+    result: {
+      place_id: 'place_abc',
+      name: 'The Crown',
+      formatted_address: '1 Main St',
+      website: 'https://thecrown.com',
+      geometry: { location: { lat: 40.7, lng: -73.9 } },
+      types: ['restaurant'],
+      opening_hours: {
+        periods: [
+          { open: { day: 1, time: '1200' }, close: { day: 1, time: '2200' } },
+        ],
+      },
+    },
+  };
+  // Third call: fetchSecondaryHours (Places API New) → no kitchen hours
+  const noSecondaryHours = {};
+
+  let callCount = 0;
+  https.get.mockImplementation((_options, cb) => {
+    const responses = [textSearchWithOne, detailsWithHours, noSecondaryHours];
+    const body = JSON.stringify(responses[callCount % responses.length]);
+    callCount++;
+    const fakeRes = {
+      on: (event, handler) => {
+        if (event === 'data') handler(body);
+        if (event === 'end') handler();
+        return fakeRes;
+      },
+    };
+    cb(fakeRes);
+    return { on: jest.fn() };
+  });
+
+  const result = await searchPlaces({ location: 'Brooklyn', apiKey: 'key' });
+  expect(result).toHaveLength(1);
+  expect(result[0].openingHours).not.toBeNull();
+  expect(result[0].openingHours).toHaveLength(1);
+  expect(result[0].openingHours[0].day).toBe(1);
+  expect(result[0].kitchenHours).toBeNull();
 });

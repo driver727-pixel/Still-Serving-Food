@@ -3,10 +3,16 @@
 jest.mock('../functions/placesClient');
 jest.mock('../functions/facebookResolver');
 jest.mock('../functions/facebookScraper');
+jest.mock('../functions/instagramScraper');
+jest.mock('../functions/osmClient');
+jest.mock('../functions/foursquareClient');
 
 const { searchPlaces } = require('../functions/placesClient');
-const { resolveFacebookUrl } = require('../functions/facebookResolver');
+const { resolveFacebookUrl, resolveInstagramUrl } = require('../functions/facebookResolver');
 const { scrapeFacebookPage } = require('../functions/facebookScraper');
+const { scrapeInstagramPage } = require('../functions/instagramScraper');
+const { searchOsmVenues, enrichVenuesWithOsmData } = require('../functions/osmClient');
+const { searchFoursquareVenues, enrichVenuesWithFoursquareData } = require('../functions/foursquareClient');
 const { runHybridPipeline, mergeVenue, buildVenueFromPlace } = require('../functions/hybridPipeline');
 
 // ---------------------------------------------------------------------------
@@ -50,6 +56,15 @@ const FB_DATA = {
 beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.GOOGLE_PLACES_API_KEY;
+
+  // Default mocks: return null/empty for all new optional sources
+  resolveInstagramUrl.mockResolvedValue(null);
+  scrapeInstagramPage.mockResolvedValue(null);
+  searchOsmVenues.mockResolvedValue([]);
+  // enrichVenuesWithOsmData is called with (venues, osmVenues); default: return venues unchanged
+  enrichVenuesWithOsmData.mockImplementation((venues) => venues);
+  searchFoursquareVenues.mockResolvedValue([]);
+  enrichVenuesWithFoursquareData.mockImplementation((venues) => venues);
 });
 
 // ---------------------------------------------------------------------------
@@ -109,13 +124,57 @@ describe('mergeVenue', () => {
     // name must come from the Google Places entity
     expect(venue.name).toBe('The Crown');
   });
+
+  test('uses Instagram hours when FB returns no hours', () => {
+    const fbNoHours = { ...FB_DATA, hourBlocks: [], is24Hours: false, hoursSource: null, hitLoginWall: false };
+    const igData = {
+      igUrl: 'https://www.instagram.com/thecrown',
+      recentPosts: ['Kitchen closes at 10pm'],
+      hourBlocks: [{ day: 1, open: 660, close: 1320, label: 'monday', inFoodSection: true, fromHint: true }],
+      is24Hours: false,
+      serving: false,
+      opensAt: null,
+      closesAt: '10:00 PM',
+      hoursSource: 'instagram_post',
+    };
+    const venue = mergeVenue(
+      { ...PLACE_WITH_FB, facebookUrl: 'https://www.facebook.com/TheCrown' },
+      fbNoHours,
+      igData,
+    );
+    expect(venue.hoursSource).toBe('instagram_post');
+    expect(venue.hourBlocks).toHaveLength(1);
+  });
+
+  test('uses Google Places kitchen hours when no social hours available', () => {
+    const kitchenHours = [{ day: 1, open: 720, close: 1260, label: 'monday', inFoodSection: true }];
+    const placeWithKitchenHours = {
+      ...PLACE_WITH_FB,
+      facebookUrl: null,
+      kitchenHours,
+      openingHours: null,
+    };
+    const venue = mergeVenue(placeWithKitchenHours, null, null);
+    expect(venue.hourBlocks).toHaveLength(1);
+    expect(venue.hoursSource).toBe('google_kitchen_hours');
+  });
+
+  test('falls back to Google Places opening hours when no kitchen hours', () => {
+    const openingHours = [{ day: 1, open: 660, close: 1320, label: 'monday', inFoodSection: false }];
+    const placeWithOpeningHours = {
+      ...PLACE_WITH_FB,
+      facebookUrl: null,
+      kitchenHours: null,
+      openingHours,
+    };
+    const venue = mergeVenue(placeWithOpeningHours, null, null);
+    expect(venue.hourBlocks).toHaveLength(1);
+    expect(venue.hoursSource).toBe('google_opening_hours');
+  });
 });
 
-// ---------------------------------------------------------------------------
-// runHybridPipeline
-// ---------------------------------------------------------------------------
 describe('runHybridPipeline', () => {
-  test('runs all 4 phases and returns merged venues', async () => {
+  test('runs all phases and returns merged venues', async () => {
     searchPlaces.mockResolvedValue([PLACE_WITH_FB, PLACE_WITHOUT_FB]);
     resolveFacebookUrl
       .mockResolvedValueOnce('https://www.facebook.com/TheCrown')
@@ -134,6 +193,9 @@ describe('runHybridPipeline', () => {
     });
 
     expect(resolveFacebookUrl).toHaveBeenCalledTimes(2);
+    // Instagram resolution is also called for each place
+    expect(resolveInstagramUrl).toHaveBeenCalledTimes(2);
+
     expect(scrapeFacebookPage).toHaveBeenCalledTimes(1);
     expect(scrapeFacebookPage).toHaveBeenCalledWith(
       'https://www.facebook.com/TheCrown',
@@ -167,7 +229,7 @@ describe('runHybridPipeline', () => {
     expect(scrapeFacebookPage).not.toHaveBeenCalled();
   });
 
-  test('handles Phase 3 failure gracefully (scrapeFacebookPage throws)', async () => {
+  test('handles Phase 3a failure gracefully (scrapeFacebookPage throws)', async () => {
     searchPlaces.mockResolvedValue([PLACE_WITH_FB]);
     resolveFacebookUrl.mockResolvedValue('https://www.facebook.com/TheCrown');
     scrapeFacebookPage.mockRejectedValue(new Error('Facebook blocked'));
@@ -213,5 +275,107 @@ describe('runHybridPipeline', () => {
     expect(searchPlaces).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 5 }),
     );
+  });
+
+  test('skips Instagram scraping when no apifyApiKey is provided', async () => {
+    searchPlaces.mockResolvedValue([PLACE_WITH_FB]);
+    resolveFacebookUrl.mockResolvedValue(null);
+    resolveInstagramUrl.mockResolvedValue('https://www.instagram.com/thecrown');
+
+    await runHybridPipeline(
+      { location: 'Brooklyn, NY' },
+      { googlePlacesApiKey: 'gp-key', firecrawlApiKey: 'fc-key' },
+      // no apifyApiKey
+    );
+
+    expect(scrapeInstagramPage).not.toHaveBeenCalled();
+  });
+
+  test('runs Instagram scraping (Phase 3b) when apifyApiKey is provided and FB has no hours', async () => {
+    const FB_NO_HOURS = { ...FB_DATA, hourBlocks: [], is24Hours: false, hoursSource: null };
+    const IG_DATA = {
+      igUrl: 'https://www.instagram.com/thecrown',
+      recentPosts: ['Kitchen closes at 10pm tonight'],
+      hourBlocks: [{ day: 1, open: 660, close: 1320, label: 'monday', inFoodSection: true, fromHint: true }],
+      is24Hours: false,
+      serving: false,
+      opensAt: null,
+      closesAt: '10:00 PM',
+      hoursSource: 'instagram_post',
+    };
+
+    searchPlaces.mockResolvedValue([PLACE_WITH_FB]);
+    resolveFacebookUrl.mockResolvedValue('https://www.facebook.com/TheCrown');
+    resolveInstagramUrl.mockResolvedValue('https://www.instagram.com/thecrown');
+    scrapeFacebookPage.mockResolvedValue(FB_NO_HOURS);
+    scrapeInstagramPage.mockResolvedValue(IG_DATA);
+
+    const venues = await runHybridPipeline(
+      { location: 'Brooklyn, NY' },
+      { googlePlacesApiKey: 'gp-key', firecrawlApiKey: 'fc-key', apifyApiKey: 'ap-key' },
+    );
+
+    expect(scrapeInstagramPage).toHaveBeenCalledWith(
+      'https://www.instagram.com/thecrown',
+      expect.objectContaining({ apifyApiKey: 'ap-key' }),
+    );
+
+    const crown = venues.find((v) => v.name === 'The Crown');
+    expect(crown.hoursSource).toBe('instagram_post');
+    expect(crown.hourBlocks).toHaveLength(1);
+  });
+
+  test('calls OSM enrichment (Phase 5) when location is provided', async () => {
+    searchPlaces.mockResolvedValue([PLACE_WITH_FB]);
+    resolveFacebookUrl.mockResolvedValue(null);
+
+    await runHybridPipeline(
+      { location: 'Brooklyn, NY' },
+      { googlePlacesApiKey: 'gp-key' },
+    );
+
+    expect(searchOsmVenues).toHaveBeenCalledWith(
+      expect.objectContaining({ location: 'Brooklyn, NY' }),
+    );
+    expect(enrichVenuesWithOsmData).toHaveBeenCalled();
+  });
+
+  test('calls Foursquare enrichment (Phase 6) when foursquareApiKey and location are provided', async () => {
+    searchPlaces.mockResolvedValue([PLACE_WITH_FB]);
+    resolveFacebookUrl.mockResolvedValue(null);
+
+    await runHybridPipeline(
+      { location: 'Brooklyn, NY' },
+      { googlePlacesApiKey: 'gp-key', foursquareApiKey: 'fsq3-key' },
+    );
+
+    expect(searchFoursquareVenues).toHaveBeenCalledWith(
+      expect.objectContaining({ location: 'Brooklyn, NY', apiKey: 'fsq3-key' }),
+    );
+    expect(enrichVenuesWithFoursquareData).toHaveBeenCalled();
+  });
+
+  test('skips Foursquare enrichment when no foursquareApiKey is provided', async () => {
+    searchPlaces.mockResolvedValue([]);
+
+    await runHybridPipeline(
+      { location: 'Brooklyn, NY' },
+      { googlePlacesApiKey: 'gp-key' },
+    );
+
+    expect(searchFoursquareVenues).not.toHaveBeenCalled();
+  });
+
+  test('continues gracefully when OSM enrichment fails', async () => {
+    searchPlaces.mockResolvedValue([PLACE_WITH_FB]);
+    resolveFacebookUrl.mockResolvedValue(null);
+    searchOsmVenues.mockRejectedValue(new Error('Overpass timeout'));
+
+    const venues = await runHybridPipeline(
+      { location: 'Brooklyn, NY' },
+      { googlePlacesApiKey: 'gp-key' },
+    );
+
+    expect(venues).toHaveLength(1);
   });
 });
