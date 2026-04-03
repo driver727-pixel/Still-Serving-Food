@@ -193,7 +193,7 @@ app.get('/api/search', async (req, res) => {
     return res.status(400).json({ error: 'name is too long (max 200 characters)' });
   }
 
-  if (servingUntil && servingUntil.length > 50) {
+  if (servingUntil && typeof servingUntil === 'string' && servingUntil.length > 50) {
     return res.status(400).json({ error: 'servingUntil is too long (max 50 characters)' });
   }
 

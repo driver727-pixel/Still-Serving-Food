@@ -420,8 +420,8 @@ describe('computeLocalNow', () => {
 
     // Build a UTC date representing 19:00 UTC on a Monday (any Monday).
     const utcMonday19 = new Date();
-    // Walk to the nearest Monday
-    const daysUntilMon = (1 - utcMonday19.getDay() + 7) % 7 || 7;
+    // Walk to the nearest Monday (stay on today if already Monday).
+    const daysUntilMon = (1 - utcMonday19.getDay() + 7) % 7;
     utcMonday19.setDate(utcMonday19.getDate() + daysUntilMon);
     // Force the UTC clock to 19:00 UTC using setUTCHours so the test is
     // timezone-independent (the test runner may itself be in any timezone).
