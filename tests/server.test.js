@@ -4,6 +4,7 @@ const request = require('supertest');
 const app = require('../functions/server');
 const venueStore = require('../functions/venueStore');
 const scraper = require('../functions/scraper');
+const jwt = require('jsonwebtoken');
 
 jest.mock('../functions/scraper');
 
@@ -20,10 +21,18 @@ const SAMPLE_VENUES = [
   },
 ];
 
+// The default SUBSCRIBER_SECRET used when the env var is not set
+const TEST_SECRET = 'change-me-in-production';
+
+function makeSubscriberToken(subscriberId, overrideSecret) {
+  return jwt.sign({ sub: subscriberId, email: 'test@example.com' }, overrideSecret || TEST_SECRET);
+}
+
 beforeEach(() => {
   venueStore.clear();
   app._searchCounters.clear();
   app._adTokens.clear();
+  app._subscriberSearches.clear();
   jest.clearAllMocks();
 });
 
@@ -273,5 +282,159 @@ describe('POST /api/scrape', () => {
       .send({ url: 'https://example.com' });
     expect(res.status).toBe(502);
     expect(res.body.error).toBe('Scrape failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/create-checkout-session
+// ---------------------------------------------------------------------------
+describe('POST /api/create-checkout-session', () => {
+  test('returns 503 when Stripe is not configured', async () => {
+    const res = await request(app).post('/api/create-checkout-session');
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/not configured/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/activate
+// ---------------------------------------------------------------------------
+describe('GET /api/activate', () => {
+  test('returns 400 when session_id is missing', async () => {
+    const res = await request(app).get('/api/activate');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/session_id/i);
+  });
+
+  test('returns 503 when Stripe is not configured', async () => {
+    const res = await request(app).get('/api/activate?session_id=cs_test_123');
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/not configured/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/subscriber-status
+// ---------------------------------------------------------------------------
+describe('GET /api/subscriber-status', () => {
+  test('returns 401 when no token is provided', async () => {
+    const res = await request(app).get('/api/subscriber-status');
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/invalid or missing/i);
+  });
+
+  test('returns 401 for an invalid token', async () => {
+    const res = await request(app).get('/api/subscriber-status?subscriberToken=not-a-real-token');
+    expect(res.status).toBe(401);
+  });
+
+  test('returns 401 for a token signed with the wrong secret', async () => {
+    const token = makeSubscriberToken('sub-wrong-secret', 'wrong-secret');
+    const res = await request(app).get(
+      '/api/subscriber-status?subscriberToken=' + encodeURIComponent(token),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  test('returns remaining searches for a valid subscriber token', async () => {
+    const subscriberId = 'sub-status-test';
+    app._subscriberSearches.set(subscriberId, 10);
+    const token = makeSubscriberToken(subscriberId);
+    const res = await request(app).get(
+      '/api/subscriber-status?subscriberToken=' + encodeURIComponent(token),
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.searchesRemaining).toBe(90);
+    expect(res.body.searchesTotal).toBe(100);
+  });
+
+  test('returns full quota for a subscriber not yet tracked in memory', async () => {
+    const token = makeSubscriberToken('sub-new');
+    const res = await request(app).get(
+      '/api/subscriber-status?subscriberToken=' + encodeURIComponent(token),
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.searchesRemaining).toBe(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/stripe-webhook
+// ---------------------------------------------------------------------------
+describe('POST /api/stripe-webhook', () => {
+  test('returns 200 when Stripe webhook is not configured', async () => {
+    const res = await request(app)
+      .post('/api/stripe-webhook')
+      .set('Content-Type', 'application/json')
+      .send('{}');
+    expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/search — subscriber token behaviour
+// ---------------------------------------------------------------------------
+describe('GET /api/search — subscriber token', () => {
+  test('subscriber token bypasses the ad gate after free quota is exhausted', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    // Exhaust free searches
+    await request(app).get('/api/search?location=City1');
+
+    const subscriberId = 'sub-bypass-test';
+    app._subscriberSearches.set(subscriberId, 0);
+    const token = makeSubscriberToken(subscriberId);
+
+    const res = await request(app).get(
+      '/api/search?location=CitySubscriberUnique&subscriberToken=' + encodeURIComponent(token),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  test('subscriber search count increments after a successful fresh search', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    const subscriberId = 'sub-increment-test';
+    app._subscriberSearches.set(subscriberId, 0);
+    const token = makeSubscriberToken(subscriberId);
+
+    await request(app).get(
+      '/api/search?location=CityIncrementTest&subscriberToken=' + encodeURIComponent(token),
+    );
+    expect(app._subscriberSearches.get(subscriberId)).toBe(1);
+  });
+
+  test('cached search does not increment subscriber count', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    const subscriberId = 'sub-cache-test';
+    app._subscriberSearches.set(subscriberId, 0);
+    const token = makeSubscriberToken(subscriberId);
+
+    // First request populates cache
+    await request(app).get(
+      '/api/search?location=CityCacheTest&subscriberToken=' + encodeURIComponent(token),
+    );
+    const usedAfterFirst = app._subscriberSearches.get(subscriberId);
+
+    // Second request hits cache
+    await request(app).get(
+      '/api/search?location=CityCacheTest&subscriberToken=' + encodeURIComponent(token),
+    );
+    expect(app._subscriberSearches.get(subscriberId)).toBe(usedAfterFirst);
+  });
+
+  test('returns 402 search_limit_reached when subscriber quota is exhausted', async () => {
+    scraper.searchVenues.mockResolvedValue(SAMPLE_VENUES);
+
+    const subscriberId = 'sub-exhausted-test';
+    app._subscriberSearches.set(subscriberId, 100); // already used all 100
+    const token = makeSubscriberToken(subscriberId);
+
+    const res = await request(app).get(
+      '/api/search?location=CityExhaustedTest&subscriberToken=' + encodeURIComponent(token),
+    );
+    expect(res.status).toBe(402);
+    expect(res.body.error).toBe('search_limit_reached');
   });
 });

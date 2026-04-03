@@ -24,6 +24,13 @@ const adProgressBar = document.getElementById('ad-progress-bar');
 const adCountdown = document.getElementById('ad-countdown');
 const adSeconds = document.getElementById('ad-seconds');
 
+/* ---- Subscriber UI refs ---- */
+const upgradeSection = document.getElementById('upgrade-section');
+const upgradeBtn = document.getElementById('upgrade-btn');
+const subscriberStatusEl = document.getElementById('subscriber-status');
+const searchesRemainingEl = document.getElementById('searches-remaining');
+const searchHintEl = document.getElementById('search-hint');
+
 /* ---- State ---- */
 let allVenues = [];
 let currentFilter = 'all';
@@ -31,6 +38,7 @@ let adsInitialized = false;
 
 const AD_DURATION_MS = 5000;
 const STORAGE_KEY = 'ssf_free_search_used';
+const SUBSCRIBER_TOKEN_KEY = 'ssf_subscriber_token';
 
 function hasFreeSearchAvailable() {
   return !sessionStorage.getItem(STORAGE_KEY);
@@ -38,6 +46,80 @@ function hasFreeSearchAvailable() {
 
 function markFreeSearchUsed() {
   sessionStorage.setItem(STORAGE_KEY, '1');
+}
+
+/* ---- Subscriber token (localStorage) ---- */
+function getSubscriberToken() {
+  return localStorage.getItem(SUBSCRIBER_TOKEN_KEY) || null;
+}
+
+function setSubscriberToken(token) {
+  localStorage.setItem(SUBSCRIBER_TOKEN_KEY, token);
+}
+
+function clearSubscriberToken() {
+  localStorage.removeItem(SUBSCRIBER_TOKEN_KEY);
+}
+
+/**
+ * Check subscriber status with the server and update the UI accordingly.
+ * Shows the upgrade prompt when no valid token is present.
+ */
+async function refreshSubscriberUI() {
+  const token = getSubscriberToken();
+  if (!token) {
+    showUpgradePrompt(true);
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/subscriber-status?subscriberToken=${encodeURIComponent(token)}`);
+    if (!res.ok) {
+      clearSubscriberToken();
+      showUpgradePrompt(true);
+      return;
+    }
+    const data = await res.json();
+    showSubscriberStatus(data.searchesRemaining);
+  } catch {
+    // Network error — leave UI in default state
+  }
+}
+
+function showUpgradePrompt(show) {
+  if (upgradeSection) upgradeSection.classList.toggle('hidden', !show);
+  if (subscriberStatusEl) subscriberStatusEl.classList.add('hidden');
+  if (searchHintEl) searchHintEl.classList.toggle('hidden', false);
+}
+
+function showSubscriberStatus(remaining) {
+  if (searchesRemainingEl) searchesRemainingEl.textContent = remaining;
+  if (subscriberStatusEl) subscriberStatusEl.classList.remove('hidden');
+  if (upgradeSection) upgradeSection.classList.add('hidden');
+  if (searchHintEl) searchHintEl.classList.add('hidden');
+}
+
+/* ---- Upgrade button ---- */
+if (upgradeBtn) {
+  upgradeBtn.addEventListener('click', async () => {
+    upgradeBtn.disabled = true;
+    upgradeBtn.textContent = 'Redirecting to checkout…';
+    try {
+      const res = await fetch('/api/create-checkout-session', { method: 'POST' });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        showError(data.error || 'Could not start checkout. Please try again.');
+        upgradeBtn.disabled = false;
+        upgradeBtn.textContent = '🔓 Unlock 100 Searches — $4.99';
+      }
+    } catch {
+      showError('Could not start checkout. Please try again.');
+      upgradeBtn.disabled = false;
+      upgradeBtn.textContent = '🔓 Unlock 100 Searches — $4.99';
+    }
+  });
 }
 
 /* ---- Ad token ---- */
@@ -91,7 +173,7 @@ function runAdCountdown() {
 adContinueBtn.addEventListener('click', async () => {
   hideAdModal();
   if (pendingSearchParams) {
-    await doSearch(pendingSearchParams, pendingAdToken);
+    await doSearch(pendingSearchParams, pendingAdToken, null);
   }
 });
 
@@ -110,9 +192,12 @@ form.addEventListener('submit', async (e) => {
   }
   hideError();
 
-  if (hasFreeSearchAvailable()) {
+  const subscriberToken = getSubscriberToken();
+  if (subscriberToken) {
+    await doSearch(params, null, subscriberToken);
+  } else if (hasFreeSearchAvailable()) {
     markFreeSearchUsed();
-    await doSearch(params, null);
+    await doSearch(params, null, null);
   } else {
     showAdModal(params);
   }
@@ -126,7 +211,7 @@ function getSearchParams() {
   };
 }
 
-async function doSearch(params, adToken) {
+async function doSearch(params, adToken, subscriberToken) {
   showLoading(true);
   hideError();
   hideResults();
@@ -137,10 +222,21 @@ async function doSearch(params, adToken) {
     if (params.location) qs.set('location', params.location);
     if (params.servingUntil) qs.set('servingUntil', params.servingUntil);
     if (adToken) qs.set('adToken', adToken);
+    if (subscriberToken) qs.set('subscriberToken', subscriberToken);
 
     const res = await fetch(`/api/search?${qs.toString()}`);
 
     if (res.status === 402) {
+      const body = await res.json().catch(() => ({}));
+
+      if (body.error === 'search_limit_reached') {
+        // Subscriber has exhausted their 100-search pass
+        clearSubscriberToken();
+        showUpgradePrompt(true);
+        showError('You\'ve used all your searches. Purchase another pass to continue.');
+        return;
+      }
+
       // Ad required — server says the free quota is exhausted for this IP
       // (e.g. token was stale); prompt user to watch another ad
       markFreeSearchUsed();
@@ -168,6 +264,11 @@ async function doSearch(params, adToken) {
 
     applyFilter(currentFilter);
     showResults(true);
+
+    // Refresh subscriber count display after a successful search
+    if (subscriberToken) {
+      await refreshSubscriberUI();
+    }
   } catch (err) {
     showError(err.message);
   } finally {
@@ -339,3 +440,6 @@ function showError(msg) {
 function hideError() {
   errorSection.classList.add('hidden');
 }
+
+// Initialise subscriber UI on page load
+refreshSubscriberUI();

@@ -39,11 +39,22 @@
       "description": "Find out which bars and restaurants near you are still serving food right now — kitchen hours, grill hours, hot food service times.",
       "applicationCategory": "FoodService",
       "operatingSystem": "All",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      }
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Free tier",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "One free search per day; additional searches unlock with a brief ad."
+        },
+        {
+          "@type": "Offer",
+          "name": "Subscriber Pass",
+          "price": "4.99",
+          "priceCurrency": "USD",
+          "description": "One-time flat fee for 100 ad-free searches."
+        }
+      ]
     }
     </script>
 
@@ -161,7 +172,14 @@
           <div class="search-actions">
             <button type="submit" id="search-btn">Search</button>
           </div>
-          <p class="search-hint">First search is free. Additional searches require watching a brief ad.</p>
+          <p class="search-hint" id="search-hint">First search is free. Additional searches require watching a brief ad.</p>
+          <div id="subscriber-status" class="subscriber-status hidden">
+            🔓 <strong id="searches-remaining">100</strong> searches remaining
+          </div>
+          <div id="upgrade-section" class="upgrade-section hidden">
+            <p class="upgrade-text">Skip the ads — unlock <strong>100 searches for $4.99</strong></p>
+            <button type="button" id="upgrade-btn" class="upgrade-btn">🔓 Unlock 100 Searches — $4.99</button>
+          </div>
         </form>
       </section>
 

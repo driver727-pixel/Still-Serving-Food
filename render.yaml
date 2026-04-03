@@ -7,3 +7,13 @@ services:
     envVars:
       - key: FIRECRAWL_API_KEY
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: SUBSCRIBER_SECRET
+        sync: false

@@ -22,7 +22,9 @@
   "dependencies": {
     "@mendable/firecrawl-js": "^4.18.0",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "stripe": "^22.0.0"
   },
   "devDependencies": {
     "jest": "^30.3.0",

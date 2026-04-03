@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment Successful — Still Serving Food</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .activation-box {
+        background: var(--surface);
+        border: 1px solid var(--surface-2);
+        border-radius: var(--radius);
+        padding: 2.5rem 2rem;
+        max-width: 480px;
+        margin: 3rem auto;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+      .activation-box h1 { font-size: 1.6rem; font-weight: 800; color: var(--accent); margin-bottom: 0.75rem; }
+      .activation-box p  { color: var(--muted); line-height: 1.6; font-size: 0.95rem; }
+      .activation-box .searches-count {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--green);
+        display: block;
+        margin: 1.25rem 0;
+      }
+      .go-home-btn {
+        display: inline-block;
+        margin-top: 1.5rem;
+        padding: 0.85rem 2rem;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 1rem;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      .go-home-btn:hover { opacity: 0.88; }
+      #status-msg { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); min-height: 1.4rem; }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>🍔 Still Serving Food</h1>
+    </header>
+
+    <main>
+      <div class="activation-box">
+        <h1>🎉 Payment Successful!</h1>
+        <p>Thank you for your purchase. Activating your subscriber pass…</p>
+        <span class="searches-count" id="searches-count" aria-live="polite">—</span>
+        <p>searches ready to use</p>
+        <p id="status-msg"></p>
+        <a href="/" class="go-home-btn" id="go-home" style="display:none">Start Searching →</a>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        'use strict';
+
+        const SUBSCRIBER_TOKEN_KEY = 'ssf_subscriber_token';
+        const statusMsg = document.getElementById('status-msg');
+        const searchesCount = document.getElementById('searches-count');
+        const goHome = document.getElementById('go-home');
+
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('session_id');
+
+        if (!sessionId) {
+          statusMsg.textContent = 'No session found. If you completed a payment, please contact support.';
+          goHome.style.display = 'inline-block';
+          return;
+        }
+
+        fetch('/api/activate?session_id=' + encodeURIComponent(sessionId))
+          .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
+          .then(function (result) {
+            if (!result.ok || !result.data.token) {
+              statusMsg.textContent = result.data.error || 'Activation failed. Please contact support.';
+              goHome.style.display = 'inline-block';
+              return;
+            }
+            localStorage.setItem(SUBSCRIBER_TOKEN_KEY, result.data.token);
+            searchesCount.textContent = result.data.searchesTotal || 100;
+            statusMsg.textContent = '✅ Your pass has been activated and saved to this browser.';
+            goHome.style.display = 'inline-block';
+          })
+          .catch(function () {
+            statusMsg.textContent = 'Network error during activation. Please try refreshing.';
+            goHome.style.display = 'inline-block';
+          });
+      })();
+    </script>
+  </body>
+</html>

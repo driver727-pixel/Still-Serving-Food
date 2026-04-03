@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment Cancelled — Still Serving Food</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .cancel-box {
+        background: var(--surface);
+        border: 1px solid var(--surface-2);
+        border-radius: var(--radius);
+        padding: 2.5rem 2rem;
+        max-width: 480px;
+        margin: 3rem auto;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+      .cancel-box h1 { font-size: 1.5rem; font-weight: 800; color: var(--muted); margin-bottom: 0.75rem; }
+      .cancel-box p  { color: var(--muted); line-height: 1.6; font-size: 0.95rem; }
+      .go-home-btn {
+        display: inline-block;
+        margin-top: 1.5rem;
+        padding: 0.85rem 2rem;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 1rem;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      .go-home-btn:hover { opacity: 0.88; }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>🍔 Still Serving Food</h1>
+    </header>
+
+    <main>
+      <div class="cancel-box">
+        <h1>Payment Cancelled</h1>
+        <p>No worries — your payment was not completed and you have not been charged.</p>
+        <p style="margin-top:0.75rem">You can still use the free tier with a brief ad for each additional search.</p>
+        <a href="/" class="go-home-btn">Back to Search</a>
+      </div>
+    </main>
+  </body>
+</html>
