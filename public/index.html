@@ -2,15 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- Google AdSense — loads ad scripts; ad units are inserted after search results -->
+    <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6419733083900935" crossorigin="anonymous"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Primary Meta Tags -->
-    <title>Still Serving Food 🍔 — Find Restaurants Still Serving Food Near You</title>
-    <meta name="title" content="Still Serving Food — Find Restaurants Still Serving Food Near You" />
-    <meta name="description" content="Find out which bars and restaurants near you are still serving food right now. Search by city or neighbourhood to see kitchen hours, grill hours, and hot food service times." />
-    <meta name="keywords" content="still serving food, kitchen hours, grill hours, food hours, late night food, restaurants serving food now, bar food hours, kitchen open, food service hours" />
+    <title>Still Serving Food — Madison Food, Sustainability &amp; Restaurant Kitchen Hours</title>
+    <meta name="title" content="Still Serving Food — Madison Food, Sustainability &amp; Restaurant Kitchen Hours" />
+    <meta name="description" content="Covering Madison's local food scene, sustainable dining, and the tools that help you find restaurants still serving food near you. Rooted in Wisconsin's co-op culture and community food systems." />
+    <meta name="keywords" content="Madison food, sustainable dining Madison, Willy Street Co-op, Madison Food Loop, local food Wisconsin, still serving food, kitchen hours, restaurants open now" />
     <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#f97316" />
 
@@ -21,33 +21,31 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://letsnarf.com/" />
     <meta property="og:site_name" content="Still Serving Food" />
-    <meta property="og:title" content="Still Serving Food — Find Restaurants Still Serving Food Near You" />
-    <meta property="og:description" content="Find out which bars and restaurants near you are still serving food right now. Search by city or neighbourhood to see kitchen hours, grill hours, and hot food service times." />
+    <meta property="og:title" content="Still Serving Food — Madison Food, Sustainability &amp; Restaurant Kitchen Hours" />
+    <meta property="og:description" content="Covering Madison's local food scene, sustainable dining, and the tools that help you find restaurants still serving food near you." />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Still Serving Food — Find Restaurants Still Serving Food Near You" />
-    <meta name="twitter:description" content="Find out which bars and restaurants near you are still serving food right now. Search by city or neighbourhood to see kitchen hours, grill hours, and hot food service times." />
+    <meta name="twitter:title" content="Still Serving Food — Madison Food &amp; Restaurant Kitchen Hours" />
+    <meta name="twitter:description" content="Covering Madison's local food scene, sustainable dining, and the tools that help you find restaurants still serving food near you." />
 
-    <!-- JSON-LD: WebApplication -->
+    <!-- JSON-LD: Blog / WebSite -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
+      "@type": "WebSite",
       "name": "Still Serving Food",
       "url": "https://letsnarf.com/",
-      "description": "Find out which bars and restaurants near you are still serving food right now — kitchen hours, grill hours, hot food service times.",
-      "applicationCategory": "FoodService",
-      "operatingSystem": "All",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
+      "description": "Covering Madison's local food scene, sustainable dining, and a free tool to find restaurants still serving food near you.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://letsnarf.com/search?location={search_term_string}",
+        "query-input": "required name=search_term_string"
       }
     }
     </script>
 
-    <!-- JSON-LD: FAQPage (GEO — helps AI search engines surface direct answers) -->
+    <!-- JSON-LD: FAQPage -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -58,31 +56,31 @@
           "name": "What is Still Serving Food?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Still Serving Food is a free web app that crawls local restaurant and bar websites in real time to find their kitchen hours, grill hours, and hot food service times — so you know exactly which places near you are still serving food right now."
+            "text": "Still Serving Food is a content site covering Madison's local food scene, sustainability, and co-op culture — plus a free web tool that crawls restaurant websites in real time to show kitchen hours and which venues are currently serving food."
           }
         },
         {
           "@type": "Question",
-          "name": "How do I find out which restaurants are still serving food near me?",
+          "name": "How do I search for restaurants still serving food near me?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Enter your city or neighbourhood (e.g. 'Brooklyn, NY' or 'Manchester, UK') in the search box and click Search. Still Serving Food instantly shows you which nearby bars and restaurants are currently serving food, along with their kitchen closing times."
+            "text": "Visit the Search page, enter your city or neighbourhood, and the tool will show you which nearby bars and restaurants are currently serving food along with their kitchen closing times."
           }
         },
         {
           "@type": "Question",
-          "name": "Does Still Serving Food show kitchen closing times?",
+          "name": "What is the Madison Food Loop?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Still Serving Food shows the exact time the kitchen closes at each venue, so you can see how much time you have to order food. It focuses on food service hours — not general opening hours or bar hours."
+            "text": "The Madison Food Loop is a community initiative in Madison, Wisconsin dedicated to reducing food waste and connecting local food producers, restaurants, and consumers to build a more sustainable regional food system."
           }
         },
         {
           "@type": "Question",
-          "name": "How accurate is the food hours information?",
+          "name": "How accurate is the kitchen hours information?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Food hours are scraped in real time from each venue's own website. While we strive for accuracy, hours can change and may not reflect special closures or seasonal changes. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information."
+            "text": "Kitchen hours are scraped in real time from each venue's own website. Results are cached for 10 minutes. Always confirm directly with the venue for the most reliable information, especially around holidays or special events."
           }
         }
       ]
@@ -93,168 +91,151 @@
   </head>
   <body>
     <noscript>
-      <p class="noscript-notice">Still Serving Food requires JavaScript to search for food-serving venues near you. Please enable JavaScript in your browser.</p>
+      <p class="noscript-notice">JavaScript is required for full site interactivity. Core articles and information are accessible without it.</p>
     </noscript>
 
-    <header class="hero">
-      <h1>🍔 Serving Food? Letsnarf!</h1>
-      <p class="tagline">
-        Find out which bars &amp; restaurants are <strong>serving food right now</strong> — grill
-        hours, kitchen hours, hot food hours.
+    <!-- ── Navigation ── -->
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/" class="site-nav-brand">🍔 Still Serving Food</a>
+      <div class="site-nav-links">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/search.html" class="site-nav-cta">Search Restaurants →</a>
+      </div>
+    </nav>
+
+    <!-- ── Hero ── -->
+    <header class="home-hero">
+      <h1>🍔 Letsnarf — Madison Food &amp; Late-Night Kitchen Hours</h1>
+      <p>
+        Your guide to Madison's local food scene, sustainable restaurants, co-op culture, and the
+        free tool that shows you which places are <strong style="color:var(--green)">still serving food right now</strong>.
       </p>
+      <a href="/search.html" class="home-hero-cta">Find What's Serving Near You →</a>
     </header>
 
-    <!-- Ad Modal Overlay -->
-    <div id="ad-modal" class="ad-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ad-modal-title">
-      <div class="ad-modal-box">
-        <h2 id="ad-modal-title">One more search? Watch a quick ad!</h2>
-        <p class="ad-modal-desc">Your first search is free. Watch a brief advertisement to unlock your next search result.</p>
-        <div class="ad-display" id="ad-display" aria-label="Advertisement">
-          <div class="ad-inner">
-            <div class="ad-logo">🍔</div>
-            <p class="ad-tagline"><strong>Still Serving Food</strong></p>
-            <p class="ad-body">The fastest way to find late-night kitchen hours near you.</p>
-            <p class="ad-cta">Discover which restaurants are still open!</p>
-          </div>
-          <div class="ad-progress-wrap">
-            <div id="ad-progress-bar" class="ad-progress-bar"></div>
-          </div>
-          <p id="ad-countdown" class="ad-countdown">Ad plays for <strong id="ad-seconds">5</strong>s…</p>
-        </div>
-        <button id="ad-continue-btn" class="ad-continue-btn" disabled>Continue to results</button>
-        <button id="ad-cancel-btn" class="ad-cancel-btn">Cancel</button>
-      </div>
+    <!-- ── Top AdSense Banner ── -->
+    <div class="homepage-ad" aria-label="Advertisement">
+      <p class="homepage-ad-label">Advertisement</p>
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-6419733083900935"
+           data-ad-slot="YOUR_AD_SLOT_ID"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
     </div>
 
-    <main>
-      <section class="search-section">
-        <form id="search-form" autocomplete="off" novalidate>
-          <div class="search-fields">
-            <div class="search-field">
-              <label for="name-input">Restaurant name</label>
-              <input
-                id="name-input"
-                type="text"
-                placeholder="e.g. The Crown &amp; Anchor"
-                autocomplete="off"
-              />
-            </div>
-            <div class="search-field">
-              <label for="location-input">Location</label>
-              <input
-                id="location-input"
-                type="text"
-                placeholder="e.g. Brooklyn, NY or Manchester, UK"
-                autocomplete="off"
-              />
-            </div>
-            <div class="search-field">
-              <label for="serving-until-input">Serving until (optional)</label>
-              <input
-                id="serving-until-input"
-                type="text"
-                placeholder="e.g. 10pm or 22:00"
-                autocomplete="off"
-              />
-            </div>
+    <!-- ── Blog Feed ── -->
+    <section class="blog-feed" aria-labelledby="articles-heading">
+      <h2 class="blog-feed-heading" id="articles-heading">Latest Articles</h2>
+      <div class="blog-grid">
+
+        <a href="/articles/willy-street-coop-local-food.html" class="blog-card">
+          <div class="blog-card-emoji">🌿</div>
+          <div class="blog-card-title">Willy Street Co-op: How Madison's Beloved Co-op Supports Local Farmers</div>
+          <div class="blog-card-excerpt">For over 50 years, Willy Street Co-op has been the heartbeat of Madison's local food economy — connecting small farms, ethical producers, and community members around real food.</div>
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Co-ops</span>
+            <span>8 min read</span>
           </div>
-          <div class="search-actions">
-            <button type="submit" id="search-btn">Search</button>
+        </a>
+
+        <a href="/articles/madison-food-loop-sustainability.html" class="blog-card">
+          <div class="blog-card-emoji">♻️</div>
+          <div class="blog-card-title">The Madison Food Loop: Closing the Loop on Food Waste in Wisconsin</div>
+          <div class="blog-card-excerpt">Food waste is one of the largest contributors to climate change. The Madison Food Loop is a community-led initiative turning that problem into opportunity — and you can participate.</div>
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Sustainability</span>
+            <span>7 min read</span>
           </div>
-          <p class="search-hint">First search is free. Additional searches require watching a brief ad.</p>
-        </form>
-      </section>
+        </a>
 
-      <section id="results-section" class="results-section hidden">
-        <div class="results-header">
-          <h2 id="results-title">Results</h2>
-          <span id="results-meta" class="results-meta"></span>
-        </div>
+        <a href="/articles/sustainable-dining-madison.html" class="blog-card">
+          <div class="blog-card-emoji">🥗</div>
+          <div class="blog-card-title">Sustainable Dining in Madison: Restaurants Putting the Planet First</div>
+          <div class="blog-card-excerpt">From compostable packaging to zero-waste kitchens, a growing wave of Madison restaurants is proving that great food and environmental responsibility go hand in hand.</div>
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Dining Guide</span>
+            <span>9 min read</span>
+          </div>
+        </a>
 
-        <div class="filter-bar">
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="serving">🟢 Serving Now</button>
-          <button class="filter-btn" data-filter="not-serving">🔴 Not Serving</button>
-        </div>
-        <div class="results-refine">
-          <label for="refine-name" class="refine-label">Filter by name:</label>
-          <input id="refine-name" type="text" class="refine-input" placeholder="Type to filter results…" />
-        </div>
+        <a href="/articles/farm-to-table-madison.html" class="blog-card">
+          <div class="blog-card-emoji">🌽</div>
+          <div class="blog-card-title">Farm-to-Table in Madison: Why Wisconsin's Capital Leads the Way</div>
+          <div class="blog-card-excerpt">Madison's Dane County Farmers' Market is one of the largest producer-only markets in the country. Discover how the farm-to-table movement took root here and where to taste it today.</div>
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Farm-to-Table</span>
+            <span>8 min read</span>
+          </div>
+        </a>
 
-        <!--
-          AdSense: ad unit shown above search results.
-          TODO after AdSense approval:
-            1. Go to AdSense → By ad unit → Display ads → create a new unit.
-            2. Copy the numeric data-ad-slot value (e.g. "1234567890").
-            3. Replace BOTH occurrences of "YOUR_AD_SLOT_ID" below with that value
-               (or use separate slot IDs for each placement if you prefer).
-        -->
-        <div class="search-ad" aria-label="Advertisement">
-          <p class="search-ad-label">Advertisement</p>
-          <ins class="adsbygoogle"
-               style="display:block"
-               data-ad-client="ca-pub-6419733083900935"
-               data-ad-slot="YOUR_AD_SLOT_ID"
-               data-ad-format="auto"
-               data-full-width-responsive="true"></ins>
-        </div>
+        <a href="/articles/reduce-food-waste-madison.html" class="blog-card">
+          <div class="blog-card-emoji">🍱</div>
+          <div class="blog-card-title">5 Ways Madison Residents Can Reduce Food Waste Right Now</div>
+          <div class="blog-card-excerpt">Small changes in how we shop, cook, and eat out can dramatically cut food waste. Here are five practical steps rooted in Madison's own food system infrastructure.</div>
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">How-To</span>
+            <span>6 min read</span>
+          </div>
+        </a>
 
-        <div id="venue-list" class="venue-list"></div>
+      </div>
+    </section>
 
-        <!-- AdSense: second ad unit shown below search results (see TODO comment above). -->
-        <div class="search-ad" aria-label="Advertisement">
-          <p class="search-ad-label">Advertisement</p>
-          <ins class="adsbygoogle"
-               style="display:block"
-               data-ad-client="ca-pub-6419733083900935"
-               data-ad-slot="YOUR_AD_SLOT_ID"
-               data-ad-format="auto"
-               data-full-width-responsive="true"></ins>
-        </div>
-      </section>
+    <!-- ── Mid-page AdSense ── -->
+    <div class="homepage-ad" aria-label="Advertisement">
+      <p class="homepage-ad-label">Advertisement</p>
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-6419733083900935"
+           data-ad-slot="YOUR_AD_SLOT_ID"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
 
-      <section id="loading" class="loading hidden">
-        <div class="spinner"></div>
-        <p>Crawling food hours…</p>
-      </section>
+    <!-- ── Search CTA Strip ── -->
+    <section class="search-cta-strip" aria-labelledby="search-cta-heading">
+      <h2 id="search-cta-heading">🔍 Is Your Favourite Restaurant Still Serving?</h2>
+      <p>Use our free real-time search to check kitchen hours, grill hours, and hot food service times at bars and restaurants near you — right now.</p>
+      <a href="/search.html" class="search-cta-btn">Search for Food Near You →</a>
+    </section>
 
-      <section id="error-section" class="error-section hidden">
-        <p id="error-message"></p>
-      </section>
-    </main>
-
+    <!-- ── FAQ ── -->
     <section class="faq-section" aria-labelledby="faq-heading">
       <h2 id="faq-heading">Frequently Asked Questions</h2>
 
       <details class="faq-item">
         <summary>What is Still Serving Food?</summary>
-        <p>Still Serving Food is a free web app that crawls local restaurant and bar websites in real time to find their kitchen hours, grill hours, and hot food service times — so you know exactly which places near you are still serving food right now.</p>
+        <p>Still Serving Food is a content site covering Madison's local food scene, sustainability, and co-op culture — plus a free web tool that crawls restaurant and bar websites in real time to show kitchen hours and which venues are currently serving food.</p>
       </details>
 
       <details class="faq-item">
-        <summary>How do I find out which restaurants are still serving food near me?</summary>
-        <p>Enter your city or neighbourhood (e.g. "Brooklyn, NY" or "Manchester, UK") in the search box and click Search. Still Serving Food instantly shows you which nearby bars and restaurants are currently serving food, along with their kitchen closing times.</p>
+        <summary>How do I find restaurants still serving food near me?</summary>
+        <p>Visit the <a href="/search.html">Search page</a>, enter your city or neighbourhood (e.g. "Madison, WI" or "Brooklyn, NY"), and the tool will show you which nearby venues are currently serving food, along with their kitchen closing times.</p>
       </details>
 
       <details class="faq-item">
-        <summary>Does Still Serving Food show kitchen closing times?</summary>
-        <p>Yes. Still Serving Food shows the exact time the kitchen closes at each venue, so you can see how much time you have to order food. It focuses on food service hours — not general opening hours or bar hours.</p>
+        <summary>What is the Madison Food Loop?</summary>
+        <p>The Madison Food Loop is a community initiative in Madison, Wisconsin dedicated to reducing food waste and building a more connected, resilient local food system. Read our <a href="/articles/madison-food-loop-sustainability.html">full article on the Madison Food Loop</a> to learn more.</p>
       </details>
 
       <details class="faq-item">
-        <summary>How accurate is the food hours information?</summary>
-        <p>Food hours are scraped in real time from each venue's own website. While we strive for accuracy, hours can change and may not reflect special closures or seasonal changes. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information.</p>
+        <summary>How accurate is the kitchen hours information?</summary>
+        <p>Kitchen hours are scraped in real time from each venue's own website and cached for 10 minutes. While we strive for accuracy, hours can change. Always confirm directly with the venue for the most reliable information, especially around holidays or special events.</p>
       </details>
     </section>
 
     <footer>
       <p>
-        Powered by
-        <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer">Firecrawl</a>
-        &mdash; hours info is scraped from venue websites and may not be 100% accurate.
+        &copy; 2024 Still Serving Food &mdash;
+        <a href="/about.html">About</a> &middot;
+        <a href="/contact.html">Contact</a> &middot;
+        <a href="/privacy.html">Privacy Policy</a> &middot;
+        Powered by <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer">Firecrawl</a>
       </p>
     </footer>
-
-    <script src="app.js"></script>
   </body>
 </html>
