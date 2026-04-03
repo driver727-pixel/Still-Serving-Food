@@ -5,6 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { searchVenues, scrapeVenue } = require('./scraper');
+const { runHybridPipeline } = require('./hybridPipeline');
 const venueStore = require('./venueStore');
 
 const app = express();
@@ -225,10 +226,20 @@ app.get('/api/search', async (req, res) => {
   }
 
   try {
-    const venues = await searchVenues(
-      { location: location || '', name: name || '', servingUntil: servingUntil || '' },
-      { limit: parseInt(limit, 10) || 10 },
-    );
+    let venues;
+    if (hasLocation && process.env.GOOGLE_PLACES_API_KEY) {
+      // Hybrid pipeline: Google Places entity verification → Facebook scraping
+      venues = await runHybridPipeline(
+        { location: location || '', name: name || '', servingUntil: servingUntil || '' },
+        { limit: parseInt(limit, 10) || 10 },
+      );
+    } else {
+      // Legacy pipeline: Firecrawl web search
+      venues = await searchVenues(
+        { location: location || '', name: name || '', servingUntil: servingUntil || '' },
+        { limit: parseInt(limit, 10) || 10 },
+      );
+    }
 
     // Sort order: regular venues first (serving before not-serving), 24-hour chains last.
     // 24-hr establishments are well-known, so regular results get priority placement
