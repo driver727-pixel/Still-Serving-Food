@@ -401,3 +401,50 @@ describe('scrapeVenue', () => {
     delete FirecrawlApp.prototype.scrape;
   });
 });
+
+// ---------------------------------------------------------------------------
+// LINK_AGGREGATOR_RE and link-aggregator filtering
+// ---------------------------------------------------------------------------
+describe('LINK_AGGREGATOR_RE and isVenueRelevant', () => {
+  const { LINK_AGGREGATOR_RE } = require('../functions/scraper');
+
+  test('LINK_AGGREGATOR_RE matches linktr.ee URLs', () => {
+    expect(LINK_AGGREGATOR_RE.test('https://linktr.ee/thecrownbar')).toBe(true);
+  });
+
+  test('LINK_AGGREGATOR_RE matches taplink.cc URLs', () => {
+    expect(LINK_AGGREGATOR_RE.test('https://taplink.cc/thecrownbar')).toBe(true);
+  });
+
+  test('LINK_AGGREGATOR_RE matches beacons.ai URLs', () => {
+    expect(LINK_AGGREGATOR_RE.test('https://beacons.ai/thecrownbar')).toBe(true);
+  });
+
+  test('LINK_AGGREGATOR_RE does not match normal restaurant URLs', () => {
+    expect(LINK_AGGREGATOR_RE.test('https://thecrownbar.com')).toBe(false);
+  });
+
+  test('isVenueRelevant rejects link-aggregator pages', () => {
+    const raw = {
+      url: 'https://linktr.ee/thecrownbar',
+      metadata: { title: 'The Crown Bar' },
+      markdown: 'Visit our website, Instagram, Facebook',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('isVenueRelevant accepts TripAdvisor individual restaurant review pages', () => {
+    const raw = {
+      url: 'https://www.tripadvisor.com/Restaurant_Review-g60827-d4891234-The_Crown_Bar.html',
+      metadata: { title: 'The Crown Bar - Restaurant Reviews - TripAdvisor' },
+      markdown: 'Kitchen hours: Mon-Sat 12pm-10pm',
+    };
+    expect(isVenueRelevant(raw)).toBe(true);
+  });
+
+  test('buildQuery includes all standard venue types', () => {
+    const q = buildQuery({ location: 'Test City' });
+    expect(q).toMatch(/pub/i);
+    expect(q).toMatch(/bistro/i);
+  });
+});
