@@ -289,6 +289,11 @@ function buildCard(venue) {
     ? `<div class="venue-url"><a href="${escapeHtml(venue.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(venue.url)}</a></div>`
     : '';
 
+  const contactHtml =
+    venue.callForHours && venue.url
+      ? `<div class="venue-contact"><a href="${escapeHtml(venue.url)}" target="_blank" rel="noopener noreferrer">📞 Contact for current hours</a></div>`
+      : '';
+
   card.innerHTML = `
     <div class="venue-header">
       <a class="venue-name" href="${escapeHtml(venue.url || '#')}" target="_blank" rel="noopener noreferrer">
@@ -298,6 +303,7 @@ function buildCard(venue) {
     </div>
     ${venue.description ? `<p class="venue-desc">${escapeHtml(venue.description)}</p>` : ''}
     ${hoursHtml}
+    ${contactHtml}
     ${hoursTableHtml}
     ${urlHtml}
   `;
