@@ -149,6 +149,9 @@ const SUBSCRIBER_SEARCHES = 100; // searches included per one-time $4.99 payment
 // Map: subscriberId (JWT sub claim) -> number of searches used
 const subscriberSearches = new Map();
 
+// Set of Stripe session IDs that have already been activated to prevent double-redemption
+const activatedSessions = new Set();
+
 // JWT signing secret — set SUBSCRIBER_SECRET in production to a long random string
 const SUBSCRIBER_SECRET = process.env.SUBSCRIBER_SECRET || 'change-me-in-production';
 
@@ -198,6 +201,7 @@ function verifySubscriberToken(token) {
 
 // Expose for testing
 app._subscriberSearches = subscriberSearches;
+app._activatedSessions = activatedSessions;
 app._activateRateLimits = activateRateLimits;
 app._subscriberStatusLimits = subscriberStatusLimits;
 app._searchRateLimits = searchRateLimits;
@@ -302,13 +306,6 @@ app.get('/api/search', async (req, res) => {
   const subscriberResult = verifySubscriberToken(subscriberToken);
   const isSubscriber = subscriberResult.valid;
 
-  // Rate-limit fresh (non-cached) search requests — 60 per IP per hour.
-  // The cache check happens below; this limiter guards the Firecrawl API calls.
-  const searchIp = req.ip || req.socket.remoteAddress || 'unknown';
-  if (!checkRateLimit(searchRateLimits, searchIp, 60, 60 * 60 * 1000)) {
-    return res.status(429).json({ error: 'Too many searches. Please wait before trying again.' });
-  }
-
   if (isSubscriber) {
     const used = subscriberSearches.get(subscriberResult.subscriberId) || 0;
     if (used >= SUBSCRIBER_SEARCHES) {
@@ -330,6 +327,13 @@ app.get('/api/search', async (req, res) => {
   const cached = venueStore.get(cacheKey);
   if (cached) {
     return res.json({ venues: cached, fromCache: true });
+  }
+
+  // Rate-limit fresh (non-cached) search requests — 60 per IP per hour.
+  // Runs after the cache check so serving cached results does not consume quota.
+  const searchIp = req.ip || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(searchRateLimits, searchIp, 60, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many searches. Please wait before trying again.' });
   }
 
   // Ad-gate check — only applied to non-subscribers on fresh (non-cached) searches
@@ -464,8 +468,14 @@ app.get('/api/activate', async (req, res) => {
       return res.status(402).json({ error: 'Payment not completed.' });
     }
 
+    // Prevent duplicate activation of the same Stripe session
+    if (activatedSessions.has(sessionId)) {
+      return res.status(409).json({ error: 'This payment session has already been activated.' });
+    }
+
     // Generate a unique subscriber ID and mint a signed JWT.
     const subscriberId = crypto.randomUUID();
+    activatedSessions.add(sessionId);
     subscriberSearches.set(subscriberId, 0);
 
     const token = jwt.sign(

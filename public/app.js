@@ -175,7 +175,8 @@ function runAdCountdown() {
 adContinueBtn.addEventListener('click', async () => {
   hideAdModal();
   if (pendingSearchParams) {
-    await doSearch(pendingSearchParams, pendingAdToken, null);
+    // A subscriber with a stale UI state might trigger the ad modal; pass their token if available.
+    await doSearch(pendingSearchParams, pendingAdToken, getSubscriberToken());
   }
 });
 
