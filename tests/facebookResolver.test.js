@@ -51,6 +51,10 @@ describe('isFacebookUrl', () => {
     expect(isFacebookUrl('https://www.facebook.com/marketplace')).toBe(false);
   });
 
+  test('recognises numeric page IDs', () => {
+    expect(isFacebookUrl('https://www.facebook.com/123456789')).toBe(true);
+  });
+
   test('rejects non-Facebook URLs', () => {
     expect(isFacebookUrl('https://www.instagram.com/myrestaurant')).toBe(false);
     expect(isFacebookUrl('https://example.com')).toBe(false);

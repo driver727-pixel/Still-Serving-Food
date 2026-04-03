@@ -21,6 +21,14 @@ describe('isFoodEstablishment', () => {
     expect(isFoodEstablishment(['cafe'])).toBe(true);
   });
 
+  test('returns true for bakery type', () => {
+    expect(isFoodEstablishment(['bakery', 'establishment'])).toBe(true);
+  });
+
+  test('returns true for meal_delivery type', () => {
+    expect(isFoodEstablishment(['meal_delivery'])).toBe(true);
+  });
+
   test('returns true for meal_takeaway type', () => {
     expect(isFoodEstablishment(['meal_takeaway'])).toBe(true);
   });
