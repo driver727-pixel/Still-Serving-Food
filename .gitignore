@@ -4,3 +4,7 @@ node_modules/
 .DS_Store
 coverage/
 dist/
+
+# Capacitor native builds (generated)
+android/
+ios/

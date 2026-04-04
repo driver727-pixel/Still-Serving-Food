@@ -97,6 +97,22 @@
     </div>
 
     <main>
+      <!-- Publisher-provided editorial introduction (always visible) -->
+      <section class="editorial-intro">
+        <h2>How to Find Late-Night Food Near You</h2>
+        <p>
+          Whether you're finishing a late shift, wrapping up a night out, or just hit with a midnight craving,
+          finding a kitchen that's still open can be surprisingly difficult. Most restaurant listing sites show
+          <em>business hours</em> — when the doors are open — but not when the <strong>kitchen stops taking orders</strong>.
+          That's the gap Letsnarf fills.
+        </p>
+        <p>
+          We crawl restaurant websites, social media pages, and structured data sources in real time to find
+          actual food-service hours. Our results show you which kitchens are still firing, what time they close,
+          and how confident we are in that information. Enter your city or neighbourhood below to get started.
+        </p>
+      </section>
+
       <section class="search-section">
         <form id="search-form" autocomplete="off" novalidate>
           <div class="search-fields">
@@ -171,6 +187,18 @@
 
         <div id="venue-list" class="venue-list"></div>
 
+        <!-- Contextual tips shown alongside results to add editorial value -->
+        <aside class="results-tips" aria-label="Late-night dining tips">
+          <h3>💡 Tips for Late-Night Diners</h3>
+          <ul>
+            <li><strong>Call ahead</strong> — Kitchen hours can change on holidays, game nights, or slow evenings. A quick phone call saves a wasted trip.</li>
+            <li><strong>Check the confidence score</strong> — We show how confident we are in each venue's hours. Scores below 30% mean you should verify before heading out.</li>
+            <li><strong>Order delivery</strong> — If the kitchen closes soon, consider ordering through DoorDash or UberEats using the quick-links on each result card.</li>
+            <li><strong>Look for "food until" clues</strong> — Many bars serve food until a set time even though the bar stays open later. Our tool specifically tracks food-service hours, not bar hours.</li>
+            <li><strong>Weekend hours differ</strong> — Friday and Saturday kitchens often stay open an hour or two later. Try searching on different nights to compare.</li>
+          </ul>
+        </aside>
+
         <!-- AdSense: second ad unit shown below search results (see TODO comment above). -->
         <div class="search-ad" aria-label="Advertisement">
           <p class="search-ad-label">Advertisement</p>
@@ -192,6 +220,28 @@
         <p id="error-message"></p>
       </section>
     </main>
+
+    <!-- How It Works — always-visible publisher content explaining the methodology -->
+    <section class="how-it-works-section" aria-labelledby="how-it-works-heading">
+      <h2 id="how-it-works-heading">How Letsnarf Finds Kitchen Hours</h2>
+      <div class="how-it-works-grid">
+        <div class="how-it-works-step">
+          <span class="step-number">1</span>
+          <h3>Multi-Source Discovery</h3>
+          <p>We search Google Places, Facebook, Instagram, OpenStreetMap, and Foursquare simultaneously to build a complete picture of each restaurant's food-service schedule.</p>
+        </div>
+        <div class="how-it-works-step">
+          <span class="step-number">2</span>
+          <h3>Smart Conflict Resolution</h3>
+          <p>When sources disagree (and they often do), our proprietary Precedence Engine weighs each source by reliability and freshness to determine the most accurate hours.</p>
+        </div>
+        <div class="how-it-works-step">
+          <span class="step-number">3</span>
+          <h3>Confidence Scoring</h3>
+          <p>Every result includes a confidence score so you know how reliable the data is. Scores below 30% trigger a "call ahead" warning — we never pretend bad data is good data.</p>
+        </div>
+      </div>
+    </section>
 
     <section class="faq-section" aria-labelledby="faq-heading">
       <h2 id="faq-heading">Frequently Asked Questions</h2>
@@ -215,6 +265,34 @@
         <summary>How accurate is the food hours information?</summary>
         <p>Food hours are scraped in real time from each venue's own website. While we strive for accuracy, hours can change and may not reflect special closures or seasonal changes. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information.</p>
       </details>
+    </section>
+
+    <!-- Related articles section adds publisher-provided content value -->
+    <section class="related-articles-section" aria-labelledby="related-articles-heading">
+      <h2 id="related-articles-heading">Related Reading</h2>
+      <p class="related-articles-desc">Explore our articles on local food culture, sustainability, and dining tips to make the most of your next meal out.</p>
+      <div class="related-articles-grid">
+        <a href="/articles/hidden-gem-patios-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🍽️</span>
+          <span class="related-article-title">Hidden Gem Patios</span>
+          <span class="related-article-excerpt">Discover the best outdoor dining spots you didn't know about — perfect for late-summer evenings.</span>
+        </a>
+        <a href="/articles/sustainable-dining-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🌿</span>
+          <span class="related-article-title">Sustainable Dining Guide</span>
+          <span class="related-article-excerpt">How local restaurants are leading the way in farm-to-table practices and reducing food waste.</span>
+        </a>
+        <a href="/articles/food-rescue-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🤝</span>
+          <span class="related-article-title">Food Rescue Programs</span>
+          <span class="related-article-excerpt">Learn about local organisations turning surplus restaurant food into meals for those who need them.</span>
+        </a>
+        <a href="/articles/farm-to-table-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🌾</span>
+          <span class="related-article-title">Farm-to-Table Movement</span>
+          <span class="related-article-excerpt">Why more chefs are sourcing ingredients from local farms and how it changes the dining experience.</span>
+        </a>
+      </div>
     </section>
 
     <footer>

@@ -7,14 +7,22 @@ const path = require('path');
 const { searchVenues, scrapeVenue } = require('./scraper');
 const { runHybridPipeline } = require('./hybridPipeline');
 const venueStore = require('./venueStore');
+const { generateAffiliateLinks } = require('./affiliateLinks');
+const { isConfidenceVerified, computeRawConfidence, mapHoursSourceToScrapeSource, SOURCE_WEIGHTS, CONFIDENCE_THRESHOLD } = require('./precedenceEngine');
+const dbClient = require('./dbClient');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// CORS — allow the static frontend hosted on letsnarf.com to call the API
-const ALLOWED_ORIGINS = new Set(['https://letsnarf.com', 'https://www.letsnarf.com']);
+// CORS — allow the static frontend hosted on letsnarf.com + Capacitor origins
+const ALLOWED_ORIGINS = new Set([
+  'https://letsnarf.com',
+  'https://www.letsnarf.com',
+  'capacitor://localhost',
+  'http://localhost'
+]);
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -255,6 +263,36 @@ app.get('/api/search', async (req, res) => {
       return 0;
     });
 
+    // Enrich venues with affiliate links, confidence scores, and kitchen_status
+    venues = venues.map((v) => {
+      const source = mapHoursSourceToScrapeSource(v.hoursSource);
+      const rawConfidence = computeRawConfidence(v, source);
+      const baseWeight = SOURCE_WEIGHTS[source] || 0.30;
+      const confidenceScore = parseFloat((baseWeight * rawConfidence).toFixed(2));
+
+      return {
+        ...v,
+        affiliate_links: generateAffiliateLinks(v),
+        kitchen_status: {
+          closes_at: v.closesAt || null,
+          confidence_score: confidenceScore,
+          verified_via: v.hoursSource || 'unknown',
+          is_verified: isConfidenceVerified(confidenceScore),
+        },
+      };
+    });
+
+    // Persist to database if available (CQRS write path: scrape → ledger → cache)
+    if (dbClient.isDbAvailable()) {
+      for (const v of venues) {
+        try {
+          await dbClient.ingestVenue(v);
+        } catch (_dbErr) {
+          // Database persistence is best-effort; don't fail the search
+        }
+      }
+    }
+
     venueStore.set(cacheKey, venues);
     incrementSearchCount(ip);
     return res.json({ venues, fromCache: false });
@@ -295,6 +333,92 @@ app.post('/api/scrape', async (req, res) => {
 });
 
 /**
+ * GET /api/v1/venues/open-now?lat=...&lng=...&radius_miles=5&time_override=HH:MM
+ *
+ * Mobile-optimized endpoint: "I am here, it is this time, what is open?"
+ * Reads from the current_kitchen_hours cache table (CQRS read path).
+ * Falls back to in-memory cache + pipeline if DB is not available.
+ */
+app.get('/api/v1/venues/open-now', async (req, res) => {
+  const { lat, lng, radius_miles, time_override, limit } = req.query;
+
+  const parsedLat = parseFloat(lat);
+  const parsedLng = parseFloat(lng);
+
+  if (isNaN(parsedLat) || isNaN(parsedLng)) {
+    return res.status(400).json({ error: 'lat and lng query parameters are required and must be valid numbers.' });
+  }
+
+  if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+    return res.status(400).json({ error: 'lat must be between -90 and 90; lng between -180 and 180.' });
+  }
+
+  const radiusMiles = Math.max(0.1, Math.min(50, parseFloat(radius_miles) || 5));
+  const maxResults = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+
+  // Determine current time (or use override for testing)
+  let now;
+  if (time_override && /^\d{2}:\d{2}$/.test(time_override)) {
+    now = time_override;
+  } else {
+    const d = new Date();
+    now = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  }
+  const dayOfWeek = new Date().getUTCDay();
+
+  // Try the CQRS read path (database)
+  if (dbClient.isDbAvailable()) {
+    try {
+      const rows = await dbClient.queryOpenVenues({
+        lat: parsedLat,
+        lng: parsedLng,
+        radiusMiles,
+        dayOfWeek,
+        currentTime: now,
+        limit: maxResults,
+      });
+
+      const venues = rows.map((row) => {
+        const confidenceScore = parseFloat(row.overall_confidence_score) || 0;
+        const distMiles = Math.sqrt(
+          Math.pow((row.lat - parsedLat) * 69.0, 2) +
+          Math.pow((row.lng - parsedLng) * 69.0 * Math.cos(parsedLat * Math.PI / 180), 2)
+        );
+
+        return {
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          distance_miles: parseFloat(distMiles.toFixed(1)),
+          kitchen_status: {
+            closes_at: row.kitchen_close_time,
+            confidence_score: confidenceScore,
+            verified_via: row.best_source,
+            is_verified: isConfidenceVerified(confidenceScore),
+          },
+          affiliate_links: generateAffiliateLinks({
+            name: row.name,
+            description: row.address,
+            city: row.city,
+          }),
+        };
+      });
+
+      return res.json({ venues });
+    } catch (dbErr) {
+      // Fall through to in-memory fallback
+      console.error('[open-now db error]', dbErr.message);
+    }
+  }
+
+  // Fallback: return empty when no DB (the search endpoint populates data)
+  return res.json({
+    venues: [],
+    message: 'Database not configured. Use /api/search to discover venues.',
+  });
+});
+
+/**
  * GET /api/health
  */
 app.get('/api/health', (_req, res) => {
@@ -302,6 +426,12 @@ app.get('/api/health', (_req, res) => {
 });
 
 if (require.main === module) {
+  // Initialize database connection if DATABASE_URL is set
+  if (process.env.DATABASE_URL) {
+    const dbOk = dbClient.initDb();
+    console.log(dbOk ? '[db] PostgreSQL connected' : '[db] PostgreSQL connection failed — using in-memory cache');
+  }
+
   app.listen(PORT, () => {
     console.log(`Still Serving Food server running on http://localhost:${PORT}`);
   });

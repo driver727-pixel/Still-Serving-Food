@@ -106,7 +106,14 @@ describe('GET /api/search', () => {
     const res = await request(app).get('/api/search?location=Brooklyn,NY');
     expect(res.status).toBe(200);
     expect(res.body.fromCache).toBe(false);
-    expect(res.body.venues).toEqual(SAMPLE_VENUES);
+    // Venues are enriched with affiliate_links and kitchen_status
+    for (const v of res.body.venues) {
+      expect(v).toMatchObject({ name: expect.any(String) });
+      expect(v.affiliate_links).toBeDefined();
+      expect(v.kitchen_status).toBeDefined();
+      expect(v.kitchen_status.confidence_score).toEqual(expect.any(Number));
+      expect(typeof v.kitchen_status.is_verified).toBe('boolean');
+    }
     expect(scraper.searchVenues).toHaveBeenCalledTimes(1);
   });
 
@@ -115,7 +122,9 @@ describe('GET /api/search', () => {
 
     const res = await request(app).get('/api/search?name=The+Crown');
     expect(res.status).toBe(200);
-    expect(res.body.venues).toEqual(SAMPLE_VENUES);
+    expect(res.body.venues.length).toBe(SAMPLE_VENUES.length);
+    expect(res.body.venues[0]).toMatchObject({ name: SAMPLE_VENUES[0].name });
+    expect(res.body.venues[0].affiliate_links).toBeDefined();
     expect(scraper.searchVenues).toHaveBeenCalledTimes(1);
   });
 
@@ -124,7 +133,8 @@ describe('GET /api/search', () => {
 
     const res = await request(app).get('/api/search?name=The+Crown&location=Brooklyn,NY');
     expect(res.status).toBe(200);
-    expect(res.body.venues).toEqual(SAMPLE_VENUES);
+    expect(res.body.venues[0]).toMatchObject({ name: SAMPLE_VENUES[0].name });
+    expect(res.body.venues[0].kitchen_status).toBeDefined();
   });
 
   test('returns venues when searching with servingUntil parameter', async () => {
@@ -132,7 +142,8 @@ describe('GET /api/search', () => {
 
     const res = await request(app).get('/api/search?location=Brooklyn,NY&servingUntil=10pm');
     expect(res.status).toBe(200);
-    expect(res.body.venues).toEqual(SAMPLE_VENUES);
+    expect(res.body.venues[0]).toMatchObject({ name: SAMPLE_VENUES[0].name });
+    expect(res.body.venues[0].affiliate_links).toBeDefined();
   });
 
   test('returns cached venues on second request', async () => {
@@ -273,5 +284,59 @@ describe('POST /api/scrape', () => {
       .send({ url: 'https://example.com' });
     expect(res.status).toBe(502);
     expect(res.body.error).toBe('Scrape failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/venues/open-now
+// ---------------------------------------------------------------------------
+describe('GET /api/v1/venues/open-now', () => {
+  test('returns 400 when lat is missing', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lng=-73.9');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/lat/i);
+  });
+
+  test('returns 400 when lng is missing', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lat=40.7');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/lat|lng/i);
+  });
+
+  test('returns 400 for out-of-range lat', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lat=100&lng=-73.9');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/lat/i);
+  });
+
+  test('returns 400 for out-of-range lng', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lat=40.7&lng=200');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/lng/i);
+  });
+
+  test('returns empty venues array when no DB configured', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lat=40.7128&lng=-74.0060');
+    expect(res.status).toBe(200);
+    expect(res.body.venues).toEqual([]);
+    expect(res.body.message).toMatch(/database/i);
+  });
+
+  test('accepts time_override parameter', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lat=40.7128&lng=-74.0060&time_override=21:00');
+    expect(res.status).toBe(200);
+    expect(res.body.venues).toEqual([]);
+  });
+
+  test('accepts radius_miles parameter', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lat=40.7128&lng=-74.0060&radius_miles=10');
+    expect(res.status).toBe(200);
+    expect(res.body.venues).toEqual([]);
+  });
+
+  test('accepts limit parameter', async () => {
+    const res = await request(app).get('/api/v1/venues/open-now?lat=40.7128&lng=-74.0060&limit=5');
+    expect(res.status).toBe(200);
+    expect(res.body.venues).toEqual([]);
   });
 });

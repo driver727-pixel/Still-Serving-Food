@@ -1,5 +1,10 @@
 'use strict';
 
+/* ---- API base URL (Capacitor native vs. web) ---- */
+const API_BASE = (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+  ? 'https://letsnarf.com'
+  : '';
+
 /* ---- DOM refs ---- */
 const form = document.getElementById('search-form');
 const nameInput = document.getElementById('name-input');
@@ -75,7 +80,7 @@ function runAdCountdown() {
       adCountdown.textContent = 'Ad complete!';
       adContinueBtn.disabled = false;
       // Pre-fetch a token so it is ready when user clicks continue
-      fetch('/api/ad-token')
+      fetch(`${API_BASE}/api/ad-token`)
         .then((r) => r.json())
         .then((d) => {
           pendingAdToken = d.token || null;
@@ -142,7 +147,7 @@ async function doSearch(params, adToken) {
     if (params.utcOffset !== undefined) qs.set('utcOffset', params.utcOffset);
     if (adToken) qs.set('adToken', adToken);
 
-    const res = await fetch(`/api/search?${qs.toString()}`);
+    const res = await fetch(`${API_BASE}/api/search?${qs.toString()}`);
 
     if (res.status === 402) {
       // Ad required — server says the free quota is exhausted for this IP
@@ -266,6 +271,35 @@ function buildCard(venue) {
     hoursHtml += `<div class="venue-hours">Next food service opens at <strong>${venue.opensAt}</strong></div>`;
   }
 
+  // Confidence warning per spec: scores below 0.30 trigger a warning
+  let confidenceHtml = '';
+  if (venue.kitchen_status && !venue.kitchen_status.is_verified) {
+    confidenceHtml = `<div class="venue-confidence-warning">⚠️ Kitchen hours unverified. Call ahead.</div>`;
+  } else if (venue.kitchen_status && venue.kitchen_status.confidence_score) {
+    const pct = Math.round(venue.kitchen_status.confidence_score * 100);
+    confidenceHtml = `<div class="venue-confidence"><span class="confidence-badge">${pct}% confidence</span> via ${escapeHtml(venue.kitchen_status.verified_via || 'unknown')}</div>`;
+  }
+
+  // Affiliate links (delivery + reservation)
+  let affiliateHtml = '';
+  if (venue.affiliate_links) {
+    const links = [];
+    if (venue.affiliate_links.delivery) {
+      if (venue.affiliate_links.delivery.doordash) {
+        links.push(`<a href="${escapeHtml(venue.affiliate_links.delivery.doordash)}" target="_blank" rel="noopener noreferrer" class="affiliate-link doordash">🚗 DoorDash</a>`);
+      }
+      if (venue.affiliate_links.delivery.ubereats) {
+        links.push(`<a href="${escapeHtml(venue.affiliate_links.delivery.ubereats)}" target="_blank" rel="noopener noreferrer" class="affiliate-link ubereats">🛵 UberEats</a>`);
+      }
+    }
+    if (venue.affiliate_links.reservation && venue.affiliate_links.reservation.resy) {
+      links.push(`<a href="${escapeHtml(venue.affiliate_links.reservation.resy)}" target="_blank" rel="noopener noreferrer" class="affiliate-link resy">📅 Resy</a>`);
+    }
+    if (links.length) {
+      affiliateHtml = `<div class="venue-affiliates">${links.join('')}</div>`;
+    }
+  }
+
   let hoursTableHtml = '';
   if (hasHours) {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -307,7 +341,9 @@ function buildCard(venue) {
     </div>
     ${venue.description ? `<p class="venue-desc">${escapeHtml(venue.description)}</p>` : ''}
     ${hoursHtml}
+    ${confidenceHtml}
     ${contactHtml}
+    ${affiliateHtml}
     ${hoursTableHtml}
     ${urlHtml}
   `;
