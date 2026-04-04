@@ -763,14 +763,14 @@ app.get('/api/business/activate', async (req, res) => {
  * Body: { "phone": "+15551234567" }
  */
 app.post('/api/business/text-number', (req, res) => {
-  const owner = verifyBusinessToken(req);
-  if (!owner) {
-    return res.status(401).json({ error: 'Valid business owner token required.' });
-  }
-
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   if (isBusinessActionRateLimited(ip, '/api/business/text-number')) {
     return res.status(429).json({ error: 'Too many requests. Please wait before requesting another phone verification.' });
+  }
+
+  const owner = verifyBusinessToken(req);
+  if (!owner) {
+    return res.status(401).json({ error: 'Valid business owner token required.' });
   }
 
   const claim = businessClaimStore.get(owner.venueKey);
@@ -804,6 +804,11 @@ app.post('/api/business/text-number', (req, res) => {
  * Body: { "phone": "+15551234567", "code": "123456" }
  */
 app.post('/api/business/text-number/verify', (req, res) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isBusinessActionRateLimited(ip, '/api/business/text-number/verify')) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before trying to verify this phone number again.' });
+  }
+
   const owner = verifyBusinessToken(req);
   if (!owner) {
     return res.status(401).json({ error: 'Valid business owner token required.' });
@@ -946,6 +951,9 @@ app.post('/api/business/inbound-text', async (req, res) => {
 
   const closedUntil = parsed.reopenAt || (() => {
     const nextMorning = new Date(receivedAt);
+    // Mirror the existing owner emergency-closure behavior: if no explicit
+    // reopen time is supplied by text, keep the venue closed through the
+    // overnight window and automatically reopen at 06:00 the next morning.
     nextMorning.setDate(nextMorning.getDate() + 1);
     nextMorning.setHours(6, 0, 0, 0);
     return nextMorning;

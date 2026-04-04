@@ -20,8 +20,11 @@ function parseExplicitTime(token) {
 
   if (meridiem) {
     if (hour < 1 || hour > 12) return null;
-    if (hour === 12) hour = 0;
-    if (meridiem === 'pm') hour += 12;
+    if (meridiem === 'am') {
+      hour = hour === 12 ? 0 : hour;
+    } else {
+      hour = hour === 12 ? 12 : hour + 12;
+    }
     return (hour * 60) + minute;
   }
 
