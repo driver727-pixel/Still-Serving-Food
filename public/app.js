@@ -295,7 +295,9 @@ function buildCard(venue) {
   const ownerTextUpdate = venue.kitchen_status && venue.kitchen_status.owner_text_update;
   if (ownerTextUpdate && ownerTextUpdate.recent) {
     const updatedAgo = relativeTime(ownerTextUpdate.updated_at);
-    if (ownerTextUpdate.type === 'open_until' && ownerTextUpdate.display_closes_at) {
+    if (ownerTextUpdate.type === 'schedule_update' && ownerTextUpdate.schedule_label) {
+      ownerTextHtml = `<div class="venue-confidence">📱 Owner updated weekly schedule · <strong>${escapeHtml(ownerTextUpdate.schedule_label)}</strong> · updated ${escapeHtml(updatedAgo)}</div>`;
+    } else if (ownerTextUpdate.type === 'open_until' && ownerTextUpdate.display_closes_at) {
       ownerTextHtml = `<div class="venue-confidence">📱 Text-confirmed open until <strong>${escapeHtml(ownerTextUpdate.display_closes_at)}</strong> · updated ${escapeHtml(updatedAgo)}</div>`;
     } else if (ownerTextUpdate.type === 'closed_until' && ownerTextUpdate.display_closed_until) {
       ownerTextHtml = `<div class="venue-confidence">📱 Owner texted closed until <strong>${escapeHtml(ownerTextUpdate.display_closed_until)}</strong> · updated ${escapeHtml(updatedAgo)}</div>`;

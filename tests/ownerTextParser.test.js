@@ -1,6 +1,6 @@
 'use strict';
 
-const { normalizePhone, parseOwnerTextCommand } = require('../functions/ownerTextParser');
+const { normalizePhone, parseOwnerTextCommand, parseScheduleCommand } = require('../functions/ownerTextParser');
 
 describe('ownerTextParser', () => {
   test('normalizes a phone number to +E164-ish format', () => {
@@ -24,7 +24,31 @@ describe('ownerTextParser', () => {
     expect(parsed.reopenAt.toISOString()).toBe('2026-04-04T18:00:00.000Z');
   });
 
+  test('parses weekly schedule commands', () => {
+    const parsed = parseScheduleCommand('MON-FRI 11-9');
+
+    expect(parsed).toMatchObject({
+      type: 'schedule_update',
+      closedDays: [],
+      scheduleLabel: 'MON-FRI 11:00 AM-9:00 PM',
+    });
+    expect(parsed.hourBlocks).toHaveLength(5);
+    expect(parsed.hourBlocks[0]).toMatchObject({ day: 1, open: 660, close: 1260 });
+    expect(parsed.hourBlocks[4]).toMatchObject({ day: 5, open: 660, close: 1260 });
+  });
+
+  test('parses closed-day schedule commands', () => {
+    const parsed = parseOwnerTextCommand('SUN CLOSED');
+
+    expect(parsed).toMatchObject({
+      type: 'schedule_update',
+      closedDays: [0],
+      hourBlocks: [],
+      scheduleLabel: 'SUN closed',
+    });
+  });
+
   test('rejects unsupported commands', () => {
-    expect(parseOwnerTextCommand('MON-FRI 11-9')).toBeNull();
+    expect(parseOwnerTextCommand('DELAY 30')).toBeNull();
   });
 });

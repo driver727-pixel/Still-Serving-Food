@@ -32,6 +32,7 @@ beforeEach(() => {
   app._ownerPhoneVerificationStore.clear();
   app._verifiedOwnerPhoneStore.clear();
   app._ownerTextUpdateStore.clear();
+  app._ownerTextScheduleStore.clear();
   app._ownerTextAuditStore.clear();
   app._ownerTextIngressRateLimit.clear();
   jest.clearAllMocks();
@@ -652,5 +653,97 @@ describe('Owner text updates', () => {
       type: 'closed_until',
       recent: true,
     });
+  });
+
+  test('returns TwiML replies for Twilio-style inbound requests', async () => {
+    const venueKey = 'the crown & anchor||https://crownandanchor.com';
+    app._businessClaimStore.set(venueKey, {
+      venueName: 'The Crown & Anchor',
+      venueUrl: 'https://crownandanchor.com',
+      paidAt: new Date(),
+      stripeSessionId: 'sess_fake',
+      verifiedPhone: '+15551234567',
+    });
+    app._verifiedOwnerPhoneStore.set('+15551234567', { venueKey, verified_at: new Date() });
+
+    const res = await request(app)
+      .post('/api/business/inbound-text')
+      .type('form')
+      .send({ From: '+15551234567', Body: 'OPEN 10' });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/xml/);
+    expect(res.text).toMatch(/<Response><Message>Marked open until/);
+  });
+
+  test('applies schedule-mode text updates to cached search results', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.setSystemTime(new Date('2026-04-04T12:00:00Z'));
+
+      const venueKey = 'the crown & anchor||https://crownandanchor.com';
+      app._businessClaimStore.set(venueKey, {
+        venueName: 'The Crown & Anchor',
+        venueUrl: 'https://crownandanchor.com',
+        paidAt: new Date(),
+        stripeSessionId: 'sess_fake',
+        verifiedPhone: '+15551234567',
+      });
+      app._verifiedOwnerPhoneStore.set('+15551234567', { venueKey, verified_at: new Date() });
+      scraper.searchVenues.mockResolvedValue([{ ...SAMPLE_VENUES[0], serving: false, closesAt: null }]);
+
+      await request(app).get('/api/search?location=Brooklyn,NY');
+
+      const textRes = await request(app)
+        .post('/api/business/inbound-text')
+        .send({ from: '+15551234567', body: 'SAT 11-9' });
+
+      expect(textRes.status).toBe(200);
+      expect(textRes.body.action).toBe('schedule_update');
+
+      const cachedSearch = await request(app).get('/api/search?location=Brooklyn,NY');
+      expect(cachedSearch.status).toBe(200);
+      expect(cachedSearch.body.venues[0].serving).toBe(true);
+      expect(cachedSearch.body.venues[0].kitchen_status.verified_via).toBe('owner_text_schedule');
+      expect(cachedSearch.body.venues[0].kitchen_status.owner_text_update).toMatchObject({
+        type: 'schedule_update',
+        schedule_label: 'SAT 11:00 AM-9:00 PM',
+        recent: true,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('records closed-day schedule updates', async () => {
+    const venueKey = 'the crown & anchor||https://crownandanchor.com';
+    app._businessClaimStore.set(venueKey, {
+      venueName: 'The Crown & Anchor',
+      venueUrl: 'https://crownandanchor.com',
+      paidAt: new Date(),
+      stripeSessionId: 'sess_fake',
+      verifiedPhone: '+15551234567',
+    });
+    app._verifiedOwnerPhoneStore.set('+15551234567', { venueKey, verified_at: new Date() });
+
+    const res = await request(app)
+      .post('/api/business/inbound-text')
+      .send({ from: '+15551234567', body: 'SUN CLOSED' });
+
+    expect(res.status).toBe(200);
+    expect(app._ownerTextScheduleStore.get(venueKey)).toMatchObject({
+      closed_days: [0],
+      schedule_label: 'SUN closed',
+    });
+  });
+});
+
+describe('Owner SMS setup UI', () => {
+  test('serves the owner SMS setup page', async () => {
+    const res = await request(app).get('/owner-sms.html');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/Owner SMS setup/i);
+    expect(res.text).toMatch(/MON-FRI 11-9/);
   });
 });
