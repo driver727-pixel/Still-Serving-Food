@@ -218,10 +218,21 @@ function applyFilter(filter) {
 function renderVenues(venues) {
   venueList.innerHTML = '';
 
+  // AdSense policy: only show ads alongside actual content, never on empty states
+  const adsTop = document.getElementById('results-ads-top');
+  const adsBottom = document.getElementById('results-ads-bottom');
+
   if (!venues.length) {
     venueList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:2rem">No venues match the selected filter.</p>';
+    // Hide ads when there are no results (low-value / empty content screen)
+    if (adsTop) adsTop.classList.add('hidden');
+    if (adsBottom) adsBottom.classList.add('hidden');
     return;
   }
+
+  // Show ads only when actual venue content is rendered
+  if (adsTop) adsTop.classList.remove('hidden');
+  if (adsBottom) adsBottom.classList.remove('hidden');
 
   const regularVenues = venues.filter((v) => !v.is24Hours);
   const venues24Hr = venues.filter((v) => v.is24Hours);
@@ -353,16 +364,20 @@ function buildCard(venue) {
 
 /* ---- Ads ---- */
 /**
- * Push each AdSense slot the first time results are displayed.
+ * Push each VISIBLE AdSense slot the first time results with actual content
+ * are displayed. Per AdSense policy, ads must only appear alongside
+ * substantial publisher-provided content — never on empty, loading,
+ * error, or purely behavioral screens.
+ *
  * Called once per page load; subsequent calls are no-ops.
- * Replace YOUR_AD_SLOT_ID placeholders in index.html with real slot IDs
- * from your AdSense account once the account is approved.
  */
 function initAds() {
   if (adsInitialized) return;
+  // Only initialize ads when there are actual venue results to show
+  if (!allVenues || allVenues.length === 0) return;
   adsInitialized = true;
-  const slots = document.querySelectorAll('.adsbygoogle');
-  // adsbygoogle.push({}) processes slots sequentially — call it once per <ins> element
+  // Only push visible ad slots (not hidden ones from empty-result states)
+  const slots = document.querySelectorAll('.search-ad:not(.hidden) .adsbygoogle');
   for (let i = 0; i < slots.length; i++) {
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});

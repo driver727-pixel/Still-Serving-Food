@@ -75,21 +75,23 @@
     </header>
 
     <!-- Ad Modal Overlay -->
+    <!-- Search-gate modal — self-promotion only, NOT a third-party ad container.
+         Per AdSense policy, no Google-served ads appear in this interstitial. -->
     <div id="ad-modal" class="ad-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ad-modal-title">
       <div class="ad-modal-box">
-        <h2 id="ad-modal-title">One more search? Watch a quick ad!</h2>
-        <p class="ad-modal-desc">Your first search is free. Watch a brief advertisement to unlock your next search result.</p>
-        <div class="ad-display" id="ad-display" aria-label="Advertisement">
+        <h2 id="ad-modal-title">Want unlimited searches?</h2>
+        <p class="ad-modal-desc">Your first search each session is free. Wait a few seconds to unlock your next result, or subscribe for unlimited access.</p>
+        <div class="ad-display" id="ad-display" aria-label="Promotional message from Still Serving Food">
           <div class="ad-inner">
             <div class="ad-logo">🍔</div>
             <p class="ad-tagline"><strong>Still Serving Food</strong></p>
             <p class="ad-body">The fastest way to find late-night kitchen hours near you.</p>
-            <p class="ad-cta">Discover which restaurants are still open!</p>
+            <p class="ad-cta">Discover which restaurants are still serving!</p>
           </div>
           <div class="ad-progress-wrap">
             <div id="ad-progress-bar" class="ad-progress-bar"></div>
           </div>
-          <p id="ad-countdown" class="ad-countdown">Ad plays for <strong id="ad-seconds">5</strong>s…</p>
+          <p id="ad-countdown" class="ad-countdown">Please wait <strong id="ad-seconds">5</strong>s…</p>
         </div>
         <button id="ad-continue-btn" class="ad-continue-btn" disabled>Continue to results</button>
         <button id="ad-cancel-btn" class="ad-cancel-btn">Cancel</button>
@@ -168,14 +170,19 @@
         </div>
 
         <!--
-          AdSense: ad unit shown above search results.
+          AdSense: ad units shown alongside search results.
+          POLICY COMPLIANCE: These ads are wrapped in #results-ads-container,
+          which is only made visible by JavaScript when venue results are
+          actually rendered. Ads never show on empty/zero-result states,
+          loading screens, error screens, or behavioral modals.
+
           TODO after AdSense approval:
             1. Go to AdSense → By ad unit → Display ads → create a new unit.
             2. Copy the numeric data-ad-slot value (e.g. "1234567890").
             3. Replace BOTH occurrences of "YOUR_AD_SLOT_ID" below with that value
                (or use separate slot IDs for each placement if you prefer).
         -->
-        <div class="search-ad" aria-label="Advertisement">
+        <div id="results-ads-top" class="search-ad hidden" aria-label="Advertisement">
           <p class="search-ad-label">Advertisement</p>
           <ins class="adsbygoogle"
                style="display:block"
@@ -199,8 +206,7 @@
           </ul>
         </aside>
 
-        <!-- AdSense: second ad unit shown below search results (see TODO comment above). -->
-        <div class="search-ad" aria-label="Advertisement">
+        <div id="results-ads-bottom" class="search-ad hidden" aria-label="Advertisement">
           <p class="search-ad-label">Advertisement</p>
           <ins class="adsbygoogle"
                style="display:block"
