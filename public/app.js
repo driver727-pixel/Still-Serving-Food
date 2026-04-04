@@ -343,6 +343,8 @@ function buildCard(venue) {
       ? `<div class="venue-contact"><a href="${escapeHtml(venue.url)}" target="_blank" rel="noopener noreferrer">📞 Contact for current hours</a></div>`
       : '';
 
+  const userReportHtml = buildUserReportWidget(venue);
+
   card.innerHTML = `
     <div class="venue-header">
       <a class="venue-name" href="${escapeHtml(venue.url || '#')}" target="_blank" rel="noopener noreferrer">
@@ -357,10 +359,75 @@ function buildCard(venue) {
     ${affiliateHtml}
     ${hoursTableHtml}
     ${urlHtml}
+    ${userReportHtml}
   `;
 
   return card;
 }
+
+/**
+ * Build the "Still taking orders?" user-report widget for a venue card.
+ * After a user votes, the button row is replaced with a thank-you message.
+ * Votes are stored in sessionStorage to prevent duplicate votes per session.
+ *
+ * @param {object} venue
+ * @returns {string} HTML string
+ */
+function buildUserReportWidget(venue) {
+  const rawKey     = `${(venue.name || '').trim()}||${(venue.url || '').trim()}`;
+  const storageKey = `ssf_voted_${rawKey}`;
+  const alreadyVoted = sessionStorage.getItem(storageKey);
+
+  let summary = '';
+  if (venue.kitchen_status && venue.kitchen_status.user_report_summary) {
+    const { vote_count, yes_count } = venue.kitchen_status.user_report_summary;
+    if (vote_count > 0) {
+      summary = `<span class="report-tally">${yes_count}/${vote_count} say still serving</span>`;
+    }
+  }
+
+  if (alreadyVoted) {
+    return `<div class="venue-feedback"><span class="venue-feedback-thanks">✅ Thanks for your report!</span>${summary}</div>`;
+  }
+
+  return `
+    <div class="venue-feedback" data-venue-name="${escapeHtml(venue.name || '')}" data-venue-url="${escapeHtml(venue.url || '')}" data-storage-key="${escapeHtml(storageKey)}">
+      <span class="venue-feedback-label">Still taking orders?</span>
+      <button class="feedback-btn feedback-yes" type="button" aria-label="Yes, still taking orders">👍 Yes</button>
+      <button class="feedback-btn feedback-no"  type="button" aria-label="No, kitchen is closed">👎 No</button>
+      ${summary}
+    </div>`;
+}
+
+/* ---- User-report click handler (event delegation on venue list) ---- */
+venueList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.feedback-btn');
+  if (!btn) return;
+
+  const widget = btn.closest('.venue-feedback');
+  if (!widget) return;
+
+  const isServing   = btn.classList.contains('feedback-yes');
+  const venueName   = widget.dataset.venueName;
+  const venueUrl    = widget.dataset.venueUrl;
+  const storageKey  = widget.dataset.storageKey;
+
+  // Optimistically replace buttons with thanks message
+  const summary = widget.querySelector('.report-tally') ? widget.querySelector('.report-tally').outerHTML : '';
+  widget.innerHTML = `<span class="venue-feedback-thanks">✅ Thanks for your report!</span>${summary}`;
+
+  sessionStorage.setItem(storageKey, '1');
+
+  try {
+    await fetch(`${API_BASE}/api/user-report`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ venue_name: venueName, venue_url: venueUrl, is_serving: isServing }),
+    });
+  } catch (_err) {
+    // Best-effort — the UI already shows thanks regardless of network state
+  }
+});
 
 /* ---- Ads ---- */
 /**

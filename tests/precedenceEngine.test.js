@@ -3,11 +3,15 @@
 const {
   SOURCE_WEIGHTS,
   CONFIDENCE_THRESHOLD,
+  USER_REPORT_BASE_WEIGHT,
+  USER_REPORT_VOTE_STEP,
+  USER_REPORT_MAX_WEIGHT,
   determineWinningHours,
   computeRawConfidence,
   isConfidenceVerified,
   mapHoursSourceToScrapeSource,
   differenceInDays,
+  aggregateUserReports,
 } = require('../functions/precedenceEngine');
 
 describe('precedenceEngine', () => {
@@ -17,7 +21,7 @@ describe('precedenceEngine', () => {
     });
 
     test('all sources have defined weights', () => {
-      const sources = ['venue_claimed', 'instagram_post', 'facebook_about', 'google_structured', 'osm_tags', 'foursquare'];
+      const sources = ['venue_claimed', 'instagram_post', 'facebook_about', 'google_structured', 'osm_tags', 'foursquare', 'user_reported'];
       for (const src of sources) {
         expect(SOURCE_WEIGHTS[src]).toBeDefined();
         expect(SOURCE_WEIGHTS[src]).toBeGreaterThan(0);
@@ -160,8 +164,88 @@ describe('precedenceEngine', () => {
       // foursquare: 0.30 * 0.5 = 0.15
       expect(result.score).toBeCloseTo(0.15, 2);
     });
+    test('emergency closure venue_claimed wins unconditionally', () => {
+      const now = new Date('2026-04-04T12:00:00Z');
+      const logs = [
+        { source: 'venue_claimed', kitchen_close_time: null, observed_at: now, raw_confidence: 1.0,
+          raw_scrape_payload: { emergency_closure: true, reason: 'robbery' } },
+        { source: 'instagram_post', kitchen_close_time: '23:00', observed_at: now, raw_confidence: 1.0 },
+        { source: 'google_structured', kitchen_close_time: '22:00', observed_at: now, raw_confidence: 0.9 },
+      ];
+      const result = determineWinningHours(logs, now);
+      expect(result.log.source).toBe('venue_claimed');
+      expect(result.log.raw_scrape_payload.emergency_closure).toBe(true);
+      expect(result.score).toBe(1.0);
+    });
+
+    test('non-emergency venue_claimed does not trigger absolute override', () => {
+      const now = new Date('2026-04-04T12:00:00Z');
+      const logs = [
+        { source: 'venue_claimed', kitchen_close_time: '22:00', observed_at: now, raw_confidence: 0.6 },
+        { source: 'instagram_post', kitchen_close_time: '23:00', observed_at: now, raw_confidence: 1.0 },
+      ];
+      const result = determineWinningHours(logs, now);
+      // venue_claimed: 1.0*0.6 = 0.60; instagram: 0.85*1.0 = 0.85 → instagram wins
+      expect(result.log.source).toBe('instagram_post');
+    });
   });
 
+  describe('aggregateUserReports', () => {
+    test('returns null for empty or missing input', () => {
+      expect(aggregateUserReports([])).toBeNull();
+      expect(aggregateUserReports(null)).toBeNull();
+      expect(aggregateUserReports(undefined)).toBeNull();
+    });
+
+    test('single yes vote returns base weight', () => {
+      const result = aggregateUserReports([{ is_serving: true }]);
+      expect(result).not.toBeNull();
+      expect(result.score).toBeCloseTo(USER_REPORT_BASE_WEIGHT, 5);
+      expect(result.is_serving_consensus).toBe(true);
+      expect(result.vote_count).toBe(1);
+      expect(result.yes_count).toBe(1);
+    });
+
+    test('single no vote returns base weight with no-consensus', () => {
+      const result = aggregateUserReports([{ is_serving: false }]);
+      expect(result.score).toBeCloseTo(USER_REPORT_BASE_WEIGHT, 5);
+      expect(result.is_serving_consensus).toBe(false);
+      expect(result.yes_count).toBe(0);
+    });
+
+    test('weight grows with more votes', () => {
+      const fiveYes = Array(5).fill({ is_serving: true });
+      const tenYes  = Array(10).fill({ is_serving: true });
+      const r5  = aggregateUserReports(fiveYes);
+      const r10 = aggregateUserReports(tenYes);
+      // 5 votes: BASE + 4*STEP; 10 votes: BASE + 9*STEP (both unanimous → score = weight)
+      expect(r5.score).toBeCloseTo(USER_REPORT_BASE_WEIGHT + 4 * USER_REPORT_VOTE_STEP, 5);
+      expect(r10.score).toBeCloseTo(USER_REPORT_BASE_WEIGHT + 9 * USER_REPORT_VOTE_STEP, 5);
+      expect(r10.score).toBeGreaterThan(r5.score);
+    });
+
+    test('weight caps at USER_REPORT_MAX_WEIGHT', () => {
+      const manyYes = Array(100).fill({ is_serving: true });
+      const result = aggregateUserReports(manyYes);
+      expect(result.score).toBeCloseTo(USER_REPORT_MAX_WEIGHT, 5);
+    });
+
+    test('consensus ratio reduces score on split vote', () => {
+      // 7 yes, 3 no → consensus = yes, ratio = 0.7
+      const votes = [...Array(7).fill({ is_serving: true }), ...Array(3).fill({ is_serving: false })];
+      const result = aggregateUserReports(votes);
+      expect(result.is_serving_consensus).toBe(true);
+      const expectedWeight = Math.min(USER_REPORT_MAX_WEIGHT, USER_REPORT_BASE_WEIGHT + 9 * USER_REPORT_VOTE_STEP);
+      expect(result.score).toBeCloseTo(expectedWeight * 0.7, 5);
+    });
+
+    test('tie goes to yes consensus', () => {
+      const votes = [{ is_serving: true }, { is_serving: false }];
+      const result = aggregateUserReports(votes);
+      // yesVotes (1) >= totalVotes/2 (1) → yes consensus
+      expect(result.is_serving_consensus).toBe(true);
+    });
+  });
   describe('computeRawConfidence', () => {
     test('returns baseline 0.5 for empty venue', () => {
       const venue = {};
@@ -244,7 +328,8 @@ describe('precedenceEngine', () => {
     });
 
     test('maps user/claimed sources', () => {
-      expect(mapHoursSourceToScrapeSource('user_reported')).toBe('venue_claimed');
+      expect(mapHoursSourceToScrapeSource('user_reported')).toBe('user_reported');
+      expect(mapHoursSourceToScrapeSource('user reported')).toBe('user_reported');
       expect(mapHoursSourceToScrapeSource('venue_claimed')).toBe('venue_claimed');
     });
 
