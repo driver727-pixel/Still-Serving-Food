@@ -220,16 +220,6 @@ function sendOwnerTextResponse(req, res, status, payload) {
     .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(message)}</Message></Response>`);
 }
 
-function createBusinessRateLimitMiddleware(pathName, message) {
-  return (req, res, next) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    if (isBusinessActionRateLimited(ip, pathName)) {
-      return res.status(429).json({ error: message });
-    }
-    return next();
-  };
-}
-
 function buildOwnerTextSummary(ownerTextUpdate) {
   if (!ownerTextUpdate) return null;
   return {
@@ -850,16 +840,14 @@ app.get('/api/business/activate', async (req, res) => {
  * Headers: Authorization: Bearer <business token>
  * Body: { "phone": "+15551234567" }
  */
-app.post(
-  '/api/business/text-number',
-  createBusinessRateLimitMiddleware(
-    '/api/business/text-number',
-    'Too many requests. Please wait before requesting another phone verification.',
-  ),
-  (req, res) => {
+app.post('/api/business/text-number', (req, res) => {
     const owner = verifyBusinessToken(req);
     if (!owner) {
       return res.status(401).json({ error: 'Valid business owner token required.' });
+    }
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    if (isBusinessActionRateLimited(ip, '/api/business/text-number')) {
+      return res.status(429).json({ error: 'Too many requests. Please wait before requesting another phone verification.' });
     }
 
     const claim = businessClaimStore.get(owner.venueKey);
@@ -885,24 +873,21 @@ app.post(
       phone,
       verification_code: process.env.NODE_ENV === 'production' ? undefined : code,
     });
-  },
-);
+});
 
 /**
  * POST /api/business/text-number/verify
  * Headers: Authorization: Bearer <business token>
  * Body: { "phone": "+15551234567", "code": "123456" }
  */
-app.post(
-  '/api/business/text-number/verify',
-  createBusinessRateLimitMiddleware(
-    '/api/business/text-number/verify',
-    'Too many requests. Please wait before trying to verify this phone number again.',
-  ),
-  (req, res) => {
+app.post('/api/business/text-number/verify', (req, res) => {
     const owner = verifyBusinessToken(req);
     if (!owner) {
       return res.status(401).json({ error: 'Valid business owner token required.' });
+    }
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    if (isBusinessActionRateLimited(ip, '/api/business/text-number/verify')) {
+      return res.status(429).json({ error: 'Too many requests. Please wait before trying to verify this phone number again.' });
     }
 
     const claim = businessClaimStore.get(owner.venueKey);
@@ -931,8 +916,7 @@ app.post(
     });
 
     return res.json({ ok: true, phone, message: 'Phone number verified for owner text updates.' });
-  },
-);
+});
 
 /**
  * POST /api/business/inbound-text
@@ -957,6 +941,9 @@ app.post('/api/business/inbound-text', async (req, res) => {
   }
   if (typeof message !== 'string' || !message.trim()) {
     return sendOwnerTextResponse(req, res, 400, { error: 'A text message body is required.' });
+  }
+  if (message.length > 160) {
+    return sendOwnerTextResponse(req, res, 400, { error: 'Text message body is too long.' });
   }
 
   const verifiedPhone = verifiedOwnerPhoneStore.get(phone);

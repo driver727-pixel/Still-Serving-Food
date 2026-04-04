@@ -76,16 +76,14 @@ function parseScheduleCommand(message) {
   if (typeof message !== 'string' || !message.trim()) return null;
 
   const normalized = message.trim().replace(/\s+/g, ' ');
-  const match = normalized.match(
-    /^((?:sun|sunday|mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday)(?:\s*(?:-|to)\s*(?:sun|sunday|mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday))?)\s+(closed|(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*-\s*(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?))$/i,
-  );
-  if (!match) return null;
+  const firstSpace = normalized.indexOf(' ');
+  if (firstSpace === -1) return null;
 
-  const dayRange = match[1];
+  const dayRange = normalized.slice(0, firstSpace).trim();
+  const instruction = normalized.slice(firstSpace + 1).trim();
   const dayIndexes = expandDayRange(dayRange);
   if (!dayIndexes.length) return null;
 
-  const instruction = match[2];
   if (/^closed$/i.test(instruction)) {
     return {
       type: 'schedule_update',
@@ -96,7 +94,11 @@ function parseScheduleCommand(message) {
     };
   }
 
-  const [openToken, closeToken] = instruction.split(/\s*-\s*/);
+  const separatorIndex = instruction.indexOf('-');
+  if (separatorIndex === -1) return null;
+  const openToken = instruction.slice(0, separatorIndex).trim();
+  const closeToken = instruction.slice(separatorIndex + 1).trim();
+  if (!openToken || !closeToken) return null;
   const openMinutes = parseTime(openToken);
   let closeMinutes = parseTime(closeToken);
   if (openMinutes == null || closeMinutes == null) return null;
@@ -125,6 +127,9 @@ function parseScheduleCommand(message) {
 
 function parseOwnerTextCommand(message, now = new Date()) {
   if (typeof message !== 'string' || !message.trim()) {
+    return null;
+  }
+  if (message.length > 160) {
     return null;
   }
 

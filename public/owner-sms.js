@@ -124,7 +124,7 @@ verifyForm.addEventListener('submit', async (event) => {
   }
 
   localStorage.setItem(OWNER_PHONE_KEY, data.phone);
-  setStatus(`Phone verified. You can now text OPEN 10, CLOSED, REOPEN 6, or MON-FRI 11-9.`);
+  setStatus(`Phone verified. You can now send OPEN 10, CLOSED, REOPEN 6, or MON-FRI 11-9.`);
 });
 
 populateFromQuery();
