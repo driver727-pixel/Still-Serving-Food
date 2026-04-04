@@ -24,6 +24,10 @@ beforeEach(() => {
   venueStore.clear();
   app._searchCounters.clear();
   app._adTokens.clear();
+  app._userReportStore.clear();
+  app._userReportRateLimit.clear();
+  app._businessClaimStore.clear();
+  app._emergencyClosureStore.clear();
   jest.clearAllMocks();
 });
 
@@ -338,5 +342,194 @@ describe('GET /api/v1/venues/open-now', () => {
     const res = await request(app).get('/api/v1/venues/open-now?lat=40.7128&lng=-74.0060&limit=5');
     expect(res.status).toBe(200);
     expect(res.body.venues).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/user-report
+// ---------------------------------------------------------------------------
+describe('POST /api/user-report', () => {
+  test('records a yes report and returns vote count', async () => {
+    const res = await request(app)
+      .post('/api/user-report')
+      .send({ venue_name: 'Test Bar', venue_url: 'https://testbar.com', is_serving: true });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.vote_count).toBe(1);
+    expect(res.body.yes_count).toBe(1);
+  });
+
+  test('records a no report', async () => {
+    const res = await request(app)
+      .post('/api/user-report')
+      .send({ venue_name: 'Test Bar', venue_url: 'https://testbar.com', is_serving: false });
+    expect(res.status).toBe(200);
+    expect(res.body.yes_count).toBe(0);
+    expect(res.body.vote_count).toBe(1);
+  });
+
+  test('accumulates multiple reports from different votes', async () => {
+    await request(app).post('/api/user-report').send({ venue_name: 'Bar A', is_serving: true });
+    app._userReportRateLimit.clear(); // reset rate limiter to allow re-voting in tests
+    await request(app).post('/api/user-report').send({ venue_name: 'Bar A', is_serving: false });
+    app._userReportRateLimit.clear();
+    const res = await request(app).post('/api/user-report').send({ venue_name: 'Bar A', is_serving: true });
+    expect(res.body.vote_count).toBe(3);
+    expect(res.body.yes_count).toBe(2);
+  });
+
+  test('rejects missing venue_name', async () => {
+    const res = await request(app).post('/api/user-report').send({ is_serving: true });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/venue_name/i);
+  });
+
+  test('rejects non-boolean is_serving', async () => {
+    const res = await request(app).post('/api/user-report').send({ venue_name: 'Bar', is_serving: 'yes' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/is_serving/i);
+  });
+
+  test('rejects venue_name that is too long', async () => {
+    const res = await request(app)
+      .post('/api/user-report')
+      .send({ venue_name: 'A'.repeat(256), is_serving: true });
+    expect(res.status).toBe(400);
+  });
+
+  test('rate-limits the same IP+venue within cooldown period', async () => {
+    await request(app).post('/api/user-report').send({ venue_name: 'Cooldown Bar', is_serving: true });
+    const res = await request(app).post('/api/user-report').send({ venue_name: 'Cooldown Bar', is_serving: false });
+    expect(res.status).toBe(429);
+    expect(res.body.error).toMatch(/already reported/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Business claim endpoints (Stripe not configured → 503)
+// ---------------------------------------------------------------------------
+describe('Business claim endpoints (Stripe not configured)', () => {
+  test('POST /api/business/create-checkout-session returns 503 without STRIPE_SECRET_KEY', async () => {
+    const res = await request(app)
+      .post('/api/business/create-checkout-session')
+      .send({ venue_name: 'My Restaurant', email: 'owner@example.com' });
+    expect(res.status).toBe(503);
+  });
+
+  test('GET /api/business/activate returns 503 without STRIPE_SECRET_KEY', async () => {
+    const res = await request(app).get('/api/business/activate?session_id=cs_test_123');
+    expect(res.status).toBe(503);
+  });
+
+  test('POST /api/business/hours returns 401 without token', async () => {
+    const res = await request(app)
+      .post('/api/business/hours')
+      .send({ day_of_week: 1, kitchen_open: '11:00', kitchen_close: '22:00' });
+    expect(res.status).toBe(401);
+  });
+
+  test('POST /api/business/close-now returns 401 without token', async () => {
+    const res = await request(app)
+      .post('/api/business/close-now')
+      .send({ reason: 'emergency' });
+    expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/business/hours — validation (with fake JWT)
+// ---------------------------------------------------------------------------
+describe('POST /api/business/hours validation', () => {
+  const jwt = require('jsonwebtoken');
+  const secret = process.env.BUSINESS_JWT_SECRET || 'business-jwt-secret-change-in-production';
+
+  function makeToken(venueKey) {
+    return jwt.sign({ venueKey, stripeSessionId: 'sess_fake', role: 'business_owner' }, secret, { expiresIn: '1y' });
+  }
+
+  test('rejects invalid day_of_week', async () => {
+    const token = makeToken('bar||');
+    app._businessClaimStore.set('bar||', { venueName: 'Bar', venueUrl: '', paidAt: new Date(), stripeSessionId: 'sess_fake' });
+    const res = await request(app)
+      .post('/api/business/hours')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ day_of_week: 9, kitchen_open: '11:00', kitchen_close: '22:00' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/day_of_week/i);
+  });
+
+  test('rejects malformed time format', async () => {
+    const token = makeToken('bar||');
+    app._businessClaimStore.set('bar||', { venueName: 'Bar', venueUrl: '', paidAt: new Date(), stripeSessionId: 'sess_fake' });
+    const res = await request(app)
+      .post('/api/business/hours')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ day_of_week: 1, kitchen_open: '9am', kitchen_close: '22:00' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/kitchen_open/i);
+  });
+
+  test('rejects when no active claim exists', async () => {
+    const token = makeToken('unclaimed-venue||');
+    const res = await request(app)
+      .post('/api/business/hours')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ day_of_week: 1, kitchen_open: '11:00', kitchen_close: '22:00' });
+    expect(res.status).toBe(403);
+  });
+
+  test('accepts valid update when claim exists', async () => {
+    const venueKey = 'my restaurant||https://myrestaurant.com';
+    const token = makeToken(venueKey);
+    app._businessClaimStore.set(venueKey, { venueName: 'My Restaurant', venueUrl: 'https://myrestaurant.com', paidAt: new Date(), stripeSessionId: 'sess_fake' });
+    const res = await request(app)
+      .post('/api/business/hours')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ day_of_week: 2, kitchen_open: '11:00', kitchen_close: '23:00' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/business/close-now
+// ---------------------------------------------------------------------------
+describe('POST /api/business/close-now', () => {
+  const jwt = require('jsonwebtoken');
+  const secret = process.env.BUSINESS_JWT_SECRET || 'business-jwt-secret-change-in-production';
+
+  function makeToken(venueKey) {
+    return jwt.sign({ venueKey, stripeSessionId: 'sess_fake', role: 'business_owner' }, secret, { expiresIn: '1y' });
+  }
+
+  test('records emergency closure and returns closed_until', async () => {
+    const venueKey = 'crisis bar||https://crisisbar.com';
+    const token = makeToken(venueKey);
+    app._businessClaimStore.set(venueKey, { venueName: 'Crisis Bar', venueUrl: 'https://crisisbar.com', paidAt: new Date(), stripeSessionId: 'sess_fake' });
+    const res = await request(app)
+      .post('/api/business/close-now')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ reason: 'robbery' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.closed_until).toBeDefined();
+    const closure = app._emergencyClosureStore.get(venueKey);
+    expect(closure).toBeDefined();
+    expect(closure.closed_until).toBeInstanceOf(Date);
+    expect(closure.reason).toBe('robbery');
+  });
+
+  test('returns 401 without token', async () => {
+    const res = await request(app).post('/api/business/close-now').send({ reason: 'test' });
+    expect(res.status).toBe(401);
+  });
+
+  test('returns 403 when no active claim', async () => {
+    const token = makeToken('no-claim||');
+    const res = await request(app)
+      .post('/api/business/close-now')
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+    expect(res.status).toBe(403);
   });
 });

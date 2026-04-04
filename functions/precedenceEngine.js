@@ -7,12 +7,13 @@
  * proprietary quality hierarchy with time-decay weighting.
  *
  * Sources ranked by base trust:
- *   venue_claimed  → 1.00  (owner-verified, no decay)
+ *   venue_claimed  → 1.00  (owner-verified, no decay; emergency closures are absolute)
  *   instagram_post → 0.85  (high intent if recent, fast decay)
  *   facebook_about → 0.75  (semi-structured, medium decay)
  *   google_structured → 0.60 (often wrong for kitchens, slow decay)
  *   osm_tags       → 0.50  (community-edited, slow decay)
  *   foursquare     → 0.30  (user tips, lowest weight)
+ *   user_reported  → 0.40–0.90 (crowd-sourced yes/no, scales with volume + consensus)
  */
 
 /** Base weights for sources (descending trust order) */
@@ -22,8 +23,27 @@ const SOURCE_WEIGHTS = {
   facebook_about: 0.75,
   google_structured: 0.60,
   osm_tags: 0.50,
-  foursquare: 0.30
+  foursquare: 0.30,
+  user_reported: 0.40
 };
+
+/**
+ * User-report aggregate weighting constants.
+ *
+ * A single report starts at BASE_WEIGHT and grows by VOTE_STEP per
+ * additional vote, capped at MAX_WEIGHT.  The volume weight is then
+ * multiplied by the consensus ratio (fraction of votes on the winning
+ * side) to give a final aggregate score.
+ *
+ * Examples (unanimous yes):
+ *   1  vote  → 0.40 × 1.0 = 0.40
+ *   5  votes → 0.60 × 1.0 = 0.60
+ *  10  votes → 0.85 × 1.0 = 0.85
+ *  11+ votes → 0.90 × 1.0 = 0.90  (capped)
+ */
+const USER_REPORT_BASE_WEIGHT = 0.40;
+const USER_REPORT_VOTE_STEP   = 0.05;
+const USER_REPORT_MAX_WEIGHT  = 0.90;
 
 /** Default source weight for unknown sources */
 const DEFAULT_SOURCE_WEIGHT = 0.30;
@@ -62,7 +82,8 @@ function mapHoursSourceToScrapeSource(hoursSource) {
   if (src.includes('facebook')) return 'facebook_about';
   if (src.includes('osm')) return 'osm_tags';
   if (src.includes('foursquare')) return 'foursquare';
-  if (src.includes('user') || src.includes('claimed')) return 'venue_claimed';
+  if (src.includes('user_reported') || src.includes('user reported')) return 'user_reported';
+  if (src.includes('claimed')) return 'venue_claimed';
   return 'google_structured';
 }
 
@@ -74,12 +95,27 @@ function mapHoursSourceToScrapeSource(hoursSource) {
  * source trust weights and time-decay penalties to select the
  * most reliable observation.
  *
- * @param {Array<{source: string, kitchen_close_time: string, observed_at: Date, raw_confidence: number}>} logs
+ * Special case: a `venue_claimed` log whose `raw_scrape_payload`
+ * contains `{ emergency_closure: true }` is an absolute override —
+ * it wins unconditionally regardless of any other source.
+ *
+ * @param {Array<{source: string, kitchen_close_time: string, observed_at: Date, raw_confidence: number, raw_scrape_payload?: object}>} logs
  * @param {Date} [now] - Override "now" for testing
  * @returns {{log: object, score: number}|null}
  */
 function determineWinningHours(logs, now) {
   if (!logs || logs.length === 0) return null;
+
+  // Emergency closure from a verified business owner is an absolute override.
+  // Return it immediately without scoring any other source.
+  for (const log of logs) {
+    if (log.source === 'venue_claimed') {
+      const payload = log.raw_scrape_payload || {};
+      if (payload.emergency_closure === true) {
+        return { log, score: 1.0 };
+      }
+    }
+  }
 
   const currentDate = now || new Date();
   let bestLog = null;
@@ -102,8 +138,8 @@ function determineWinningHours(logs, now) {
       timeDecayPenalty = daysOld * 0.02; // 2% per day
     }
 
-    // Venue-claimed data never decays
-    if (log.source === 'venue_claimed') {
+    // Venue-claimed data and user reports never decay
+    if (log.source === 'venue_claimed' || log.source === 'user_reported') {
       timeDecayPenalty = 0;
     }
 
@@ -160,6 +196,40 @@ function computeRawConfidence(venue, source) {
 }
 
 /**
+ * Aggregate crowd-sourced user reports into a single confidence signal.
+ *
+ * Each report is a simple yes/no: "Is this kitchen still taking orders?"
+ * Volume and consensus together determine how much to trust the aggregate.
+ *
+ * The returned object is NOT a log entry — it is a blending signal used
+ * by the search handler to adjust the scraped-data confidence score:
+ *   - is_serving_consensus = true  → boost confidence toward aggregate score
+ *   - is_serving_consensus = false → suppress confidence using aggregate score
+ *
+ * @param {Array<{is_serving: boolean, observed_at: Date}>} reports
+ * @returns {{ score: number, is_serving_consensus: boolean, vote_count: number, yes_count: number }|null}
+ */
+function aggregateUserReports(reports) {
+  if (!reports || reports.length === 0) return null;
+
+  const totalVotes  = reports.length;
+  const yesVotes    = reports.filter((r) => r.is_serving === true).length;
+  const isServingConsensus = yesVotes >= totalVotes / 2;
+  const agreeingVotes      = isServingConsensus ? yesVotes : (totalVotes - yesVotes);
+  const consensusRatio     = agreeingVotes / totalVotes;
+
+  // Volume weight: starts at BASE and grows by VOTE_STEP per extra vote, capped at MAX
+  const volumeWeight = Math.min(
+    USER_REPORT_MAX_WEIGHT,
+    USER_REPORT_BASE_WEIGHT + (totalVotes - 1) * USER_REPORT_VOTE_STEP
+  );
+
+  const score = volumeWeight * consensusRatio;
+
+  return { score, is_serving_consensus: isServingConsensus, vote_count: totalVotes, yes_count: yesVotes };
+}
+
+/**
  * Check if a confidence score meets the minimum threshold
  * for showing data without a warning.
  *
@@ -180,9 +250,13 @@ module.exports = {
   DEFAULT_SOURCE_WEIGHT,
   CONFIDENCE_THRESHOLD,
   CONFIDENCE_BASELINE,
+  USER_REPORT_BASE_WEIGHT,
+  USER_REPORT_VOTE_STEP,
+  USER_REPORT_MAX_WEIGHT,
   determineWinningHours,
   computeRawConfidence,
   isConfidenceVerified,
   mapHoursSourceToScrapeSource,
-  differenceInDays
+  differenceInDays,
+  aggregateUserReports
 };
