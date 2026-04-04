@@ -8,7 +8,7 @@ const { searchVenues, scrapeVenue } = require('./scraper');
 const { runHybridPipeline } = require('./hybridPipeline');
 const venueStore = require('./venueStore');
 const { generateAffiliateLinks } = require('./affiliateLinks');
-const { isConfidenceVerified, computeRawConfidence, mapHoursSourceToScrapeSource, SOURCE_WEIGHTS, CONFIDENCE_THRESHOLD } = require('./precedenceEngine');
+const { isConfidenceVerified, computeRawConfidence, mapHoursSourceToScrapeSource, SOURCE_WEIGHTS, DEFAULT_SOURCE_WEIGHT, CONFIDENCE_THRESHOLD } = require('./precedenceEngine');
 const dbClient = require('./dbClient');
 
 const app = express();
@@ -267,7 +267,7 @@ app.get('/api/search', async (req, res) => {
     venues = venues.map((v) => {
       const source = mapHoursSourceToScrapeSource(v.hoursSource);
       const rawConfidence = computeRawConfidence(v, source);
-      const baseWeight = SOURCE_WEIGHTS[source] || 0.30;
+      const baseWeight = SOURCE_WEIGHTS[source] || DEFAULT_SOURCE_WEIGHT;
       const confidenceScore = parseFloat((baseWeight * rawConfidence).toFixed(2));
 
       return {
@@ -380,9 +380,10 @@ app.get('/api/v1/venues/open-now', async (req, res) => {
 
       const venues = rows.map((row) => {
         const confidenceScore = parseFloat(row.overall_confidence_score) || 0;
+        const MILES_PER_DEG = 69.0;
         const distMiles = Math.sqrt(
-          Math.pow((row.lat - parsedLat) * 69.0, 2) +
-          Math.pow((row.lng - parsedLng) * 69.0 * Math.cos(parsedLat * Math.PI / 180), 2)
+          Math.pow((row.lat - parsedLat) * MILES_PER_DEG, 2) +
+          Math.pow((row.lng - parsedLng) * MILES_PER_DEG * Math.cos(parsedLat * Math.PI / 180), 2)
         );
 
         return {

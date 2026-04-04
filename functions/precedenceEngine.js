@@ -15,6 +15,7 @@
  *   foursquare     → 0.30  (user tips, lowest weight)
  */
 
+/** Base weights for sources (descending trust order) */
 const SOURCE_WEIGHTS = {
   venue_claimed: 1.0,
   instagram_post: 0.85,
@@ -23,6 +24,20 @@ const SOURCE_WEIGHTS = {
   osm_tags: 0.50,
   foursquare: 0.30
 };
+
+/** Default source weight for unknown sources */
+const DEFAULT_SOURCE_WEIGHT = 0.30;
+
+/** Scoring constants for computeRawConfidence */
+const CONFIDENCE_BASELINE = 0.5;
+const BOOST_HAS_HOURS = 0.2;
+const BOOST_NON_HINT = 0.1;
+const BOOST_FOOD_SECTION = 0.1;
+const PENALTY_CALL_FOR_HOURS = 0.3;
+const PENALTY_24_HOURS = 0.05;
+
+/** Minimum confidence threshold for verified data */
+const CONFIDENCE_THRESHOLD = 0.30;
 
 /**
  * Compute days between two dates (floor).
@@ -92,7 +107,7 @@ function determineWinningHours(logs, now) {
       timeDecayPenalty = 0;
     }
 
-    const baseWeight = SOURCE_WEIGHTS[log.source] || 0.30;
+    const baseWeight = SOURCE_WEIGHTS[log.source] || DEFAULT_SOURCE_WEIGHT;
     const rawConfidence = typeof log.raw_confidence === 'number' ? log.raw_confidence : 0.5;
     const finalScore = (baseWeight * rawConfidence) - timeDecayPenalty;
 
@@ -114,31 +129,31 @@ function determineWinningHours(logs, now) {
  * @returns {number} Confidence between 0.0 and 1.0
  */
 function computeRawConfidence(venue, source) {
-  let score = 0.5; // baseline
+  let score = CONFIDENCE_BASELINE;
 
   // Boost for explicit hour data
   if (venue.hourBlocks && venue.hourBlocks.length > 0) {
-    score += 0.2;
+    score += BOOST_HAS_HOURS;
   }
 
   // Boost for non-hint hours (explicit in source)
   if (venue.hourBlocks && venue.hourBlocks.some(b => !b.fromHint)) {
-    score += 0.1;
+    score += BOOST_NON_HINT;
   }
 
   // Boost for food-section-specific hours
   if (venue.hourBlocks && venue.hourBlocks.some(b => b.inFoodSection)) {
-    score += 0.1;
+    score += BOOST_FOOD_SECTION;
   }
 
   // Penalty for callForHours
   if (venue.callForHours) {
-    score -= 0.3;
+    score -= PENALTY_CALL_FOR_HOURS;
   }
 
   // Penalty if 24-hour flag set (often unreliable)
   if (venue.is24Hours) {
-    score -= 0.05;
+    score -= PENALTY_24_HOURS;
   }
 
   return Math.max(0, Math.min(1, score));
@@ -155,15 +170,16 @@ function computeRawConfidence(venue, source) {
  * @returns {boolean}
  */
 function isConfidenceVerified(score) {
-  return typeof score === 'number' && score >= 0.30;
+  return typeof score === 'number' && score >= CONFIDENCE_THRESHOLD;
 }
 
 /** Minimum confidence threshold */
-const CONFIDENCE_THRESHOLD = 0.30;
 
 module.exports = {
   SOURCE_WEIGHTS,
+  DEFAULT_SOURCE_WEIGHT,
   CONFIDENCE_THRESHOLD,
+  CONFIDENCE_BASELINE,
   determineWinningHours,
   computeRawConfidence,
   isConfidenceVerified,

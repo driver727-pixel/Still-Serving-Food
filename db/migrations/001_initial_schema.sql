@@ -33,7 +33,7 @@ CREATE TABLE kitchen_hours_log (
     day_of_week SMALLINT CHECK (day_of_week BETWEEN 0 AND 6),
     kitchen_open_time TIME,
     kitchen_close_time TIME,
-    confidence_score DECIMAL(3,2),
+    confidence_score DECIMAL(3,2) CHECK (confidence_score BETWEEN 0 AND 1),
     raw_scrape_payload JSONB,
     observed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -46,7 +46,7 @@ CREATE TABLE current_kitchen_hours (
     kitchen_open_time TIME,
     kitchen_close_time TIME,
     best_source scrape_source,
-    overall_confidence_score DECIMAL(3,2),
+    overall_confidence_score DECIMAL(3,2) CHECK (overall_confidence_score BETWEEN 0 AND 1),
     last_verified_at TIMESTAMP WITH TIME ZONE,
     PRIMARY KEY (venue_id, day_of_week)
 );

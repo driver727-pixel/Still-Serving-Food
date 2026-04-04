@@ -1,7 +1,7 @@
 'use strict';
 
 /* ---- API base URL (Capacitor native vs. web) ---- */
-const API_BASE = (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+const API_BASE = (typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())
   ? 'https://letsnarf.com'
   : '';
 

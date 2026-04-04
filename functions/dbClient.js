@@ -214,9 +214,10 @@ async function queryOpenVenues(params) {
     limit = 20
   } = params;
 
-  // Approximate degree-based distance (1 degree ≈ 69 miles)
-  const latRange = radiusMiles / 69.0;
-  const lngRange = radiusMiles / (69.0 * Math.cos(lat * Math.PI / 180));
+  // Approximate degree-based distance (1 degree latitude ≈ 69 miles)
+  const MILES_PER_DEGREE = 69.0;
+  const latRange = radiusMiles / MILES_PER_DEGREE;
+  const lngRange = radiusMiles / (MILES_PER_DEGREE * Math.cos(lat * Math.PI / 180));
 
   const result = await pool.query(
     `SELECT v.id, v.name, v.address, v.city, v.state, v.lat, v.lng,
