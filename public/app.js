@@ -1,5 +1,10 @@
 'use strict';
 
+/* ---- API base URL (Capacitor native vs. web) ---- */
+const API_BASE = (typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())
+  ? 'https://letsnarf.com'
+  : '';
+
 /* ---- DOM refs ---- */
 const form = document.getElementById('search-form');
 const nameInput = document.getElementById('name-input');
@@ -75,7 +80,7 @@ function runAdCountdown() {
       adCountdown.textContent = 'Ad complete!';
       adContinueBtn.disabled = false;
       // Pre-fetch a token so it is ready when user clicks continue
-      fetch('/api/ad-token')
+      fetch(`${API_BASE}/api/ad-token`)
         .then((r) => r.json())
         .then((d) => {
           pendingAdToken = d.token || null;
@@ -142,7 +147,7 @@ async function doSearch(params, adToken) {
     if (params.utcOffset !== undefined) qs.set('utcOffset', params.utcOffset);
     if (adToken) qs.set('adToken', adToken);
 
-    const res = await fetch(`/api/search?${qs.toString()}`);
+    const res = await fetch(`${API_BASE}/api/search?${qs.toString()}`);
 
     if (res.status === 402) {
       // Ad required — server says the free quota is exhausted for this IP
@@ -213,10 +218,21 @@ function applyFilter(filter) {
 function renderVenues(venues) {
   venueList.innerHTML = '';
 
+  // AdSense policy: only show ads alongside actual content, never on empty states
+  const adsTop = document.getElementById('results-ads-top');
+  const adsBottom = document.getElementById('results-ads-bottom');
+
   if (!venues.length) {
     venueList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:2rem">No venues match the selected filter.</p>';
+    // Hide ads when there are no results (low-value / empty content screen)
+    if (adsTop) adsTop.classList.add('hidden');
+    if (adsBottom) adsBottom.classList.add('hidden');
     return;
   }
+
+  // Show ads only when actual venue content is rendered
+  if (adsTop) adsTop.classList.remove('hidden');
+  if (adsBottom) adsBottom.classList.remove('hidden');
 
   const regularVenues = venues.filter((v) => !v.is24Hours);
   const venues24Hr = venues.filter((v) => v.is24Hours);
@@ -266,6 +282,35 @@ function buildCard(venue) {
     hoursHtml += `<div class="venue-hours">Next food service opens at <strong>${venue.opensAt}</strong></div>`;
   }
 
+  // Confidence warning per spec: scores below 0.30 trigger a warning
+  let confidenceHtml = '';
+  if (venue.kitchen_status && !venue.kitchen_status.is_verified) {
+    confidenceHtml = `<div class="venue-confidence-warning">⚠️ Kitchen hours unverified. Call ahead.</div>`;
+  } else if (venue.kitchen_status && venue.kitchen_status.confidence_score) {
+    const pct = Math.round(venue.kitchen_status.confidence_score * 100);
+    confidenceHtml = `<div class="venue-confidence"><span class="confidence-badge">${pct}% confidence</span> via ${escapeHtml(venue.kitchen_status.verified_via || 'unknown')}</div>`;
+  }
+
+  // Affiliate links (delivery + reservation)
+  let affiliateHtml = '';
+  if (venue.affiliate_links) {
+    const links = [];
+    if (venue.affiliate_links.delivery) {
+      if (venue.affiliate_links.delivery.doordash) {
+        links.push(`<a href="${escapeHtml(venue.affiliate_links.delivery.doordash)}" target="_blank" rel="noopener noreferrer" class="affiliate-link doordash">🚗 DoorDash</a>`);
+      }
+      if (venue.affiliate_links.delivery.ubereats) {
+        links.push(`<a href="${escapeHtml(venue.affiliate_links.delivery.ubereats)}" target="_blank" rel="noopener noreferrer" class="affiliate-link ubereats">🛵 UberEats</a>`);
+      }
+    }
+    if (venue.affiliate_links.reservation && venue.affiliate_links.reservation.resy) {
+      links.push(`<a href="${escapeHtml(venue.affiliate_links.reservation.resy)}" target="_blank" rel="noopener noreferrer" class="affiliate-link resy">📅 Resy</a>`);
+    }
+    if (links.length) {
+      affiliateHtml = `<div class="venue-affiliates">${links.join('')}</div>`;
+    }
+  }
+
   let hoursTableHtml = '';
   if (hasHours) {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -307,7 +352,9 @@ function buildCard(venue) {
     </div>
     ${venue.description ? `<p class="venue-desc">${escapeHtml(venue.description)}</p>` : ''}
     ${hoursHtml}
+    ${confidenceHtml}
     ${contactHtml}
+    ${affiliateHtml}
     ${hoursTableHtml}
     ${urlHtml}
   `;
@@ -317,16 +364,20 @@ function buildCard(venue) {
 
 /* ---- Ads ---- */
 /**
- * Push each AdSense slot the first time results are displayed.
+ * Push each VISIBLE AdSense slot the first time results with actual content
+ * are displayed. Per AdSense policy, ads must only appear alongside
+ * substantial publisher-provided content — never on empty, loading,
+ * error, or purely behavioral screens.
+ *
  * Called once per page load; subsequent calls are no-ops.
- * Replace YOUR_AD_SLOT_ID placeholders in index.html with real slot IDs
- * from your AdSense account once the account is approved.
  */
 function initAds() {
   if (adsInitialized) return;
+  // Only initialize ads when there are actual venue results to show
+  if (!allVenues || allVenues.length === 0) return;
   adsInitialized = true;
-  const slots = document.querySelectorAll('.adsbygoogle');
-  // adsbygoogle.push({}) processes slots sequentially — call it once per <ins> element
+  // Only push visible ad slots (not hidden ones from empty-result states)
+  const slots = document.querySelectorAll('.search-ad:not(.hidden) .adsbygoogle');
   for (let i = 0; i < slots.length; i++) {
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});

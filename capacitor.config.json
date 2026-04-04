@@ -1,0 +1,19 @@
+{
+  "appId": "com.letsnarf.app",
+  "appName": "Letsnarf",
+  "webDir": "public",
+  "server": {
+    "url": "https://letsnarf.com",
+    "cleartext": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1a1a2e",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "Dark"
+    }
+  }
+}

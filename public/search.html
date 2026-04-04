@@ -75,21 +75,23 @@
     </header>
 
     <!-- Ad Modal Overlay -->
+    <!-- Search-gate modal — self-promotion only, NOT a third-party ad container.
+         Per AdSense policy, no Google-served ads appear in this interstitial. -->
     <div id="ad-modal" class="ad-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ad-modal-title">
       <div class="ad-modal-box">
-        <h2 id="ad-modal-title">One more search? Watch a quick ad!</h2>
-        <p class="ad-modal-desc">Your first search is free. Watch a brief advertisement to unlock your next search result.</p>
-        <div class="ad-display" id="ad-display" aria-label="Advertisement">
+        <h2 id="ad-modal-title">Want unlimited searches?</h2>
+        <p class="ad-modal-desc">Your first search each session is free. Wait a few seconds to unlock your next result, or subscribe for unlimited access.</p>
+        <div class="ad-display" id="ad-display" aria-label="Promotional message from Still Serving Food">
           <div class="ad-inner">
             <div class="ad-logo">🍔</div>
             <p class="ad-tagline"><strong>Still Serving Food</strong></p>
             <p class="ad-body">The fastest way to find late-night kitchen hours near you.</p>
-            <p class="ad-cta">Discover which restaurants are still open!</p>
+            <p class="ad-cta">Discover which restaurants are still serving!</p>
           </div>
           <div class="ad-progress-wrap">
             <div id="ad-progress-bar" class="ad-progress-bar"></div>
           </div>
-          <p id="ad-countdown" class="ad-countdown">Ad plays for <strong id="ad-seconds">5</strong>s…</p>
+          <p id="ad-countdown" class="ad-countdown">Please wait <strong id="ad-seconds">5</strong>s…</p>
         </div>
         <button id="ad-continue-btn" class="ad-continue-btn" disabled>Continue to results</button>
         <button id="ad-cancel-btn" class="ad-cancel-btn">Cancel</button>
@@ -97,6 +99,22 @@
     </div>
 
     <main>
+      <!-- Publisher-provided editorial introduction (always visible) -->
+      <section class="editorial-intro">
+        <h2>How to Find Late-Night Food Near You</h2>
+        <p>
+          Whether you're finishing a late shift, wrapping up a night out, or just hit with a midnight craving,
+          finding a kitchen that's still open can be surprisingly difficult. Most restaurant listing sites show
+          <em>business hours</em> — when the doors are open — but not when the <strong>kitchen stops taking orders</strong>.
+          That's the gap Letsnarf fills.
+        </p>
+        <p>
+          We crawl restaurant websites, social media pages, and structured data sources in real time to find
+          actual food-service hours. Our results show you which kitchens are still firing, what time they close,
+          and how confident we are in that information. Enter your city or neighbourhood below to get started.
+        </p>
+      </section>
+
       <section class="search-section">
         <form id="search-form" autocomplete="off" novalidate>
           <div class="search-fields">
@@ -152,14 +170,19 @@
         </div>
 
         <!--
-          AdSense: ad unit shown above search results.
+          AdSense: ad units shown alongside search results.
+          POLICY COMPLIANCE: These ads are wrapped in #results-ads-container,
+          which is only made visible by JavaScript when venue results are
+          actually rendered. Ads never show on empty/zero-result states,
+          loading screens, error screens, or behavioral modals.
+
           TODO after AdSense approval:
             1. Go to AdSense → By ad unit → Display ads → create a new unit.
             2. Copy the numeric data-ad-slot value (e.g. "1234567890").
             3. Replace BOTH occurrences of "YOUR_AD_SLOT_ID" below with that value
                (or use separate slot IDs for each placement if you prefer).
         -->
-        <div class="search-ad" aria-label="Advertisement">
+        <div id="results-ads-top" class="search-ad hidden" aria-label="Advertisement">
           <p class="search-ad-label">Advertisement</p>
           <ins class="adsbygoogle"
                style="display:block"
@@ -171,8 +194,19 @@
 
         <div id="venue-list" class="venue-list"></div>
 
-        <!-- AdSense: second ad unit shown below search results (see TODO comment above). -->
-        <div class="search-ad" aria-label="Advertisement">
+        <!-- Contextual tips shown alongside results to add editorial value -->
+        <aside class="results-tips" aria-label="Late-night dining tips">
+          <h3>💡 Tips for Late-Night Diners</h3>
+          <ul>
+            <li><strong>Call ahead</strong> — Kitchen hours can change on holidays, game nights, or slow evenings. A quick phone call saves a wasted trip.</li>
+            <li><strong>Check the confidence score</strong> — We show how confident we are in each venue's hours. Scores below 30% mean you should verify before heading out.</li>
+            <li><strong>Order delivery</strong> — If the kitchen closes soon, consider ordering through DoorDash or UberEats using the quick-links on each result card.</li>
+            <li><strong>Look for "food until" clues</strong> — Many bars serve food until a set time even though the bar stays open later. Our tool specifically tracks food-service hours, not bar hours.</li>
+            <li><strong>Weekend hours differ</strong> — Friday and Saturday kitchens often stay open an hour or two later. Try searching on different nights to compare.</li>
+          </ul>
+        </aside>
+
+        <div id="results-ads-bottom" class="search-ad hidden" aria-label="Advertisement">
           <p class="search-ad-label">Advertisement</p>
           <ins class="adsbygoogle"
                style="display:block"
@@ -192,6 +226,28 @@
         <p id="error-message"></p>
       </section>
     </main>
+
+    <!-- How It Works — always-visible publisher content explaining the methodology -->
+    <section class="how-it-works-section" aria-labelledby="how-it-works-heading">
+      <h2 id="how-it-works-heading">How Letsnarf Finds Kitchen Hours</h2>
+      <div class="how-it-works-grid">
+        <div class="how-it-works-step">
+          <span class="step-number">1</span>
+          <h3>Multi-Source Discovery</h3>
+          <p>We search Google Places, Facebook, Instagram, OpenStreetMap, and Foursquare simultaneously to build a complete picture of each restaurant's food-service schedule.</p>
+        </div>
+        <div class="how-it-works-step">
+          <span class="step-number">2</span>
+          <h3>Smart Conflict Resolution</h3>
+          <p>When sources disagree (and they often do), our proprietary Precedence Engine weighs each source by reliability and freshness to determine the most accurate hours.</p>
+        </div>
+        <div class="how-it-works-step">
+          <span class="step-number">3</span>
+          <h3>Confidence Scoring</h3>
+          <p>Every result includes a confidence score so you know how reliable the data is. Scores below 30% trigger a "call ahead" warning — we never pretend bad data is good data.</p>
+        </div>
+      </div>
+    </section>
 
     <section class="faq-section" aria-labelledby="faq-heading">
       <h2 id="faq-heading">Frequently Asked Questions</h2>
@@ -215,6 +271,34 @@
         <summary>How accurate is the food hours information?</summary>
         <p>Food hours are scraped in real time from each venue's own website. While we strive for accuracy, hours can change and may not reflect special closures or seasonal changes. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information.</p>
       </details>
+    </section>
+
+    <!-- Related articles section adds publisher-provided content value -->
+    <section class="related-articles-section" aria-labelledby="related-articles-heading">
+      <h2 id="related-articles-heading">Related Reading</h2>
+      <p class="related-articles-desc">Explore our articles on local food culture, sustainability, and dining tips to make the most of your next meal out.</p>
+      <div class="related-articles-grid">
+        <a href="/articles/hidden-gem-patios-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🍽️</span>
+          <span class="related-article-title">Hidden Gem Patios</span>
+          <span class="related-article-excerpt">Discover the best outdoor dining spots you didn't know about — perfect for late-summer evenings.</span>
+        </a>
+        <a href="/articles/sustainable-dining-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🌿</span>
+          <span class="related-article-title">Sustainable Dining Guide</span>
+          <span class="related-article-excerpt">How local restaurants are leading the way in farm-to-table practices and reducing food waste.</span>
+        </a>
+        <a href="/articles/food-rescue-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🤝</span>
+          <span class="related-article-title">Food Rescue Programs</span>
+          <span class="related-article-excerpt">Learn about local organisations turning surplus restaurant food into meals for those who need them.</span>
+        </a>
+        <a href="/articles/farm-to-table-madison.html" class="related-article-card">
+          <span class="related-article-emoji">🌾</span>
+          <span class="related-article-title">Farm-to-Table Movement</span>
+          <span class="related-article-excerpt">Why more chefs are sourcing ingredients from local farms and how it changes the dining experience.</span>
+        </a>
+      </div>
     </section>
 
     <footer>
