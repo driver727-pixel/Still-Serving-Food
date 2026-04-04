@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { searchVenues, scrapeVenue } = require('./scraper');
 const { runHybridPipeline } = require('./hybridPipeline');
@@ -19,11 +20,14 @@ const {
   aggregateUserReports,
 } = require('./precedenceEngine');
 const dbClient = require('./dbClient');
+const { normalizePhone, parseOwnerTextCommand } = require('./ownerTextParser');
+const { isCurrentlyServing, formatTime } = require('./hoursParser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 // CORS — allow the static frontend hosted on letsnarf.com + Capacitor origins
 const ALLOWED_ORIGINS = new Set([
@@ -139,6 +143,14 @@ const USER_REPORT_COOLDOWN_MS = 5 * 60 * 1000;
  */
 const businessActionRateLimit = new Map();
 const BUSINESS_ACTION_COOLDOWN_MS = 60 * 1000;
+const ownerPhoneVerificationStore = new Map();
+const verifiedOwnerPhoneStore = new Map();
+const ownerTextUpdateStore = new Map();
+const ownerTextScheduleStore = new Map();
+const ownerTextAuditStore = new Map();
+const ownerTextIngressRateLimit = new Map();
+const OWNER_TEXT_COOLDOWN_MS = 15 * 1000;
+const OWNER_TEXT_FRESH_MS = 6 * 60 * 60 * 1000;
 
 /**
  * Check and record a business action rate-limit hit.
@@ -153,6 +165,110 @@ function isBusinessActionRateLimited(ip, path) {
   if (lastAt && Date.now() - lastAt < BUSINESS_ACTION_COOLDOWN_MS) return true;
   businessActionRateLimit.set(key, Date.now());
   return false;
+}
+
+function isOwnerTextRateLimited(phone) {
+  const lastAt = ownerTextIngressRateLimit.get(phone);
+  if (lastAt && Date.now() - lastAt < OWNER_TEXT_COOLDOWN_MS) return true;
+  ownerTextIngressRateLimit.set(phone, Date.now());
+  return false;
+}
+
+function generateVerificationCode() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function formatDisplayTime(date) {
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function appendOwnerTextAudit(venueKey, event) {
+  const existing = ownerTextAuditStore.get(venueKey) || [];
+  existing.push(event);
+  ownerTextAuditStore.set(venueKey, existing.slice(-20));
+}
+
+function escapeXml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function isTwilioWebhookRequest(req) {
+  return Boolean(
+    req.headers['x-twilio-signature']
+    || Object.prototype.hasOwnProperty.call(req.body || {}, 'From')
+    || Object.prototype.hasOwnProperty.call(req.body || {}, 'Body'),
+  );
+}
+
+function sendOwnerTextResponse(req, res, status, payload) {
+  if (!isTwilioWebhookRequest(req)) {
+    return res.status(status).json(payload);
+  }
+
+  const message = payload.reply || payload.error || 'OK';
+  return res
+    .status(200)
+    .type('text/xml')
+    .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(message)}</Message></Response>`);
+}
+
+function buildOwnerTextSummary(ownerTextUpdate) {
+  if (!ownerTextUpdate) return null;
+  return {
+    type: ownerTextUpdate.type,
+    updated_at: ownerTextUpdate.received_at.toISOString(),
+    phone_last4: ownerTextUpdate.phone_last4,
+    schedule_label: ownerTextUpdate.schedule_label || null,
+    closes_at: ownerTextUpdate.close_at ? ownerTextUpdate.close_at.toISOString() : null,
+    display_closes_at: ownerTextUpdate.display_close_at || null,
+    closed_until: ownerTextUpdate.closed_until ? ownerTextUpdate.closed_until.toISOString() : null,
+    display_closed_until: ownerTextUpdate.display_closed_until || null,
+    recent: true,
+  };
+}
+
+function getOwnerScheduleOverride(venueKey, now) {
+  const schedule = ownerTextScheduleStore.get(venueKey);
+  if (!schedule) return null;
+
+  const summary = buildOwnerTextSummary({
+    type: 'schedule_update',
+    received_at: schedule.received_at,
+    phone_last4: schedule.phone_last4,
+    schedule_label: schedule.schedule_label,
+  });
+
+  if (schedule.closed_days.includes(now.getDay())) {
+    return {
+      serving: false,
+      opensAt: null,
+      closesAt: null,
+      summary,
+    };
+  }
+
+  const relevantBlocks = schedule.hour_blocks.filter((block) => {
+    if (block.day === now.getDay()) return true;
+    const prevDay = (now.getDay() + 6) % 7;
+    return block.day === prevDay && block.close <= block.open;
+  });
+  if (!relevantBlocks.length) return null;
+
+  const scheduleState = isCurrentlyServing(relevantBlocks, now);
+  return {
+    serving: scheduleState.serving,
+    opensAt: scheduleState.opensAt != null ? formatTime(scheduleState.opensAt) : null,
+    closesAt: scheduleState.closesAt != null ? formatTime(scheduleState.closesAt) : null,
+    summary,
+  };
 }
 
 /**
@@ -184,8 +300,12 @@ function getVenueKey(name, url) {
 function applyUserReportEnrichment(venues) {
   if (!venues || venues.length === 0) return venues;
   const now = new Date();
-  return venues.map((v) => {
+  const enriched = venues.map((v) => {
     const vKey = getVenueKey(v.name, v.url);
+    const ownerTextUpdate = ownerTextUpdateStore.get(vKey);
+    const ownerSchedule = getOwnerScheduleOverride(vKey, now);
+    const hasFreshOwnerText = ownerTextUpdate
+      && (now.getTime() - ownerTextUpdate.received_at.getTime()) <= OWNER_TEXT_FRESH_MS;
 
     // Business emergency closure always wins — it is an absolute override that
     // outweighs all user reports and all scraped data.
@@ -198,17 +318,62 @@ function applyUserReportEnrichment(venues) {
           ...v.kitchen_status,
           confidence_score: 1.0,
           is_verified: true,
-          verified_via: 'venue_claimed',
+          verified_via: hasFreshOwnerText ? 'owner_text' : 'venue_claimed',
           emergency_closure: true,
           emergency_reason: closure.reason || null,
+          owner_text_update: hasFreshOwnerText ? buildOwnerTextSummary(ownerTextUpdate) : null,
           user_report_summary: null,
+        },
+      };
+    }
+
+    if (hasFreshOwnerText && ownerTextUpdate.type === 'open_until' && ownerTextUpdate.close_at > now) {
+      return {
+        ...v,
+        serving: true,
+        opensAt: null,
+        closesAt: ownerTextUpdate.display_close_at,
+        kitchen_status: {
+          ...v.kitchen_status,
+          closes_at: ownerTextUpdate.display_close_at,
+          confidence_score: 1.0,
+          is_verified: true,
+          verified_via: 'owner_text',
+          owner_text_update: buildOwnerTextSummary(ownerTextUpdate),
+          user_report_summary: null,
+        },
+      };
+    }
+
+    if (ownerSchedule) {
+      return {
+        ...v,
+        serving: ownerSchedule.serving,
+        opensAt: ownerSchedule.opensAt,
+        closesAt: ownerSchedule.closesAt,
+        kitchen_status: {
+          ...v.kitchen_status,
+          closes_at: ownerSchedule.closesAt,
+          confidence_score: 1.0,
+          is_verified: true,
+          verified_via: 'owner_text_schedule',
+          owner_text_update: ownerSchedule.summary,
         },
       };
     }
 
     const reports = userReportStore.get(vKey) || [];
     const agg = aggregateUserReports(reports);
-    if (!agg) return v;
+    if (!agg) {
+      if (!hasFreshOwnerText) return v;
+      return {
+        ...v,
+        kitchen_status: {
+          ...v.kitchen_status,
+          owner_text_update: buildOwnerTextSummary(ownerTextUpdate),
+        },
+      };
+    }
 
     let confidenceScore = v.kitchen_status ? v.kitchen_status.confidence_score : 0;
     if (agg.is_serving_consensus) {
@@ -225,6 +390,7 @@ function applyUserReportEnrichment(venues) {
         ...v.kitchen_status,
         confidence_score: confidenceScore,
         is_verified: isConfidenceVerified(confidenceScore),
+        owner_text_update: hasFreshOwnerText ? buildOwnerTextSummary(ownerTextUpdate) : null,
         user_report_summary: {
           vote_count: agg.vote_count,
           yes_count: agg.yes_count,
@@ -232,6 +398,16 @@ function applyUserReportEnrichment(venues) {
       },
     };
   });
+  enriched.sort((a, b) => {
+    // Only boost fresh owner-text confirmations when they say the venue is
+    // currently serving; recent closure updates remain visible in-place but do
+    // not jump above still-serving venues in the default search ordering.
+    const aRecent = a.serving === true && a.kitchen_status && a.kitchen_status.owner_text_update && a.kitchen_status.owner_text_update.recent;
+    const bRecent = b.serving === true && b.kitchen_status && b.kitchen_status.owner_text_update && b.kitchen_status.owner_text_update.recent;
+    if (aRecent !== bRecent) return aRecent ? -1 : 1;
+    return 0;
+  });
+  return enriched;
 }
 
 // ---------------------------------------------------------------------------
@@ -315,6 +491,12 @@ app._userReportRateLimit = userReportRateLimit;
 app._businessClaimStore = businessClaimStore;
 app._emergencyClosureStore = emergencyClosureStore;
 app._businessActionRateLimit = businessActionRateLimit;
+app._ownerPhoneVerificationStore = ownerPhoneVerificationStore;
+app._verifiedOwnerPhoneStore = verifiedOwnerPhoneStore;
+app._ownerTextUpdateStore = ownerTextUpdateStore;
+app._ownerTextScheduleStore = ownerTextScheduleStore;
+app._ownerTextAuditStore = ownerTextAuditStore;
+app._ownerTextIngressRateLimit = ownerTextIngressRateLimit;
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -638,14 +820,332 @@ app.get('/api/business/activate', async (req, res) => {
       venueUrl,
       paidAt: new Date(),
       stripeSessionId: session.id,
-    });
+     });
 
-    const token = signBusinessToken(venueKey, session.id);
-    return res.json({ ok: true, token, venue_name: venueName });
-  } catch (err) {
+     const token = signBusinessToken(venueKey, session.id);
+     return res.json({
+       ok: true,
+       token,
+       venue_name: venueName,
+       owner_setup_url: `/owner-sms.html?token=${encodeURIComponent(token)}`,
+     });
+   } catch (err) {
     console.error('[business activate error]', err.message);
     return res.status(502).json({ error: 'Failed to activate business claim.' });
   }
+});
+
+/**
+ * POST /api/business/text-number
+ * Headers: Authorization: Bearer <business token>
+ * Body: { "phone": "+15551234567" }
+ */
+app.post('/api/business/text-number', (req, res) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isBusinessActionRateLimited(ip, '/api/business/text-number')) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before requesting another phone verification.' });
+  }
+
+  const owner = verifyBusinessToken(req);
+  if (!owner) {
+    return res.status(401).json({ error: 'Valid business owner token required.' });
+  }
+
+  const claim = businessClaimStore.get(owner.venueKey);
+  if (!claim) {
+    return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
+  }
+
+  const phone = normalizePhone(req.body.phone);
+  if (!phone) {
+    return res.status(400).json({ error: 'phone must be a valid phone number' });
+  }
+
+  const code = generateVerificationCode();
+  ownerPhoneVerificationStore.set(owner.venueKey, {
+    phone,
+    code,
+    requested_at: new Date(),
+  });
+
+  return res.json({
+    ok: true,
+    message: 'Verification code generated. Texting updates stay locked until this number is verified.',
+    phone,
+    verification_code: process.env.NODE_ENV === 'production' ? undefined : code,
+  });
+});
+
+/**
+ * POST /api/business/text-number/verify
+ * Headers: Authorization: Bearer <business token>
+ * Body: { "phone": "+15551234567", "code": "123456" }
+ */
+app.post('/api/business/text-number/verify', (req, res) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isBusinessActionRateLimited(ip, '/api/business/text-number/verify')) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before trying to verify this phone number again.' });
+  }
+
+  const owner = verifyBusinessToken(req);
+  if (!owner) {
+    return res.status(401).json({ error: 'Valid business owner token required.' });
+  }
+
+  const claim = businessClaimStore.get(owner.venueKey);
+  if (!claim) {
+    return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
+  }
+
+  const pending = ownerPhoneVerificationStore.get(owner.venueKey);
+  const phone = normalizePhone(req.body.phone);
+  const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
+
+  if (!pending || !phone || pending.phone !== phone || pending.code !== code) {
+    return res.status(400).json({ error: 'Invalid phone verification attempt.' });
+  }
+
+  const verifiedAt = new Date();
+  verifiedOwnerPhoneStore.set(phone, {
+    venueKey: owner.venueKey,
+    verified_at: verifiedAt,
+  });
+  ownerPhoneVerificationStore.delete(owner.venueKey);
+  businessClaimStore.set(owner.venueKey, {
+    ...claim,
+    verifiedPhone: phone,
+    verifiedPhoneAt: verifiedAt,
+  });
+
+  return res.json({ ok: true, phone, message: 'Phone number verified for owner text updates.' });
+});
+
+/**
+ * POST /api/business/inbound-text
+ * Body: { "from": "+15551234567", "body": "OPEN 10" }
+ */
+app.post('/api/business/inbound-text', async (req, res) => {
+  const requiredSecret = process.env.OWNER_TEXT_WEBHOOK_SECRET;
+  const providedSecret = req.headers['x-owner-text-secret'] || req.query.secret || req.body.secret;
+  if (requiredSecret && providedSecret !== requiredSecret) {
+    return sendOwnerTextResponse(req, res, 401, { error: 'Invalid inbound text secret.' });
+  }
+
+  const phone = normalizePhone(req.body.from || req.body.phone || req.body.From);
+  const message = typeof req.body.body === 'string'
+    ? req.body.body
+    : typeof req.body.message === 'string'
+      ? req.body.message
+      : req.body.Body;
+
+  if (!phone) {
+    return sendOwnerTextResponse(req, res, 400, { error: 'A valid sender phone number is required.' });
+  }
+  if (typeof message !== 'string' || !message.trim()) {
+    return sendOwnerTextResponse(req, res, 400, { error: 'A text message body is required.' });
+  }
+  if (message.length > 160) {
+    return sendOwnerTextResponse(req, res, 400, { error: 'Text message body is too long.' });
+  }
+
+  const verifiedPhone = verifiedOwnerPhoneStore.get(phone);
+  if (!verifiedPhone) {
+    return sendOwnerTextResponse(req, res, 403, { error: 'Phone number is not verified for owner updates.' });
+  }
+  if (isOwnerTextRateLimited(phone)) {
+    return sendOwnerTextResponse(req, res, 429, { error: 'Too many text updates. Please wait before sending another message.' });
+  }
+
+  const claim = businessClaimStore.get(verifiedPhone.venueKey);
+  if (!claim) {
+    return sendOwnerTextResponse(req, res, 403, { error: 'No active claim found for this venue.' });
+  }
+
+  const receivedAt = new Date();
+  const parsed = parseOwnerTextCommand(message, receivedAt);
+  if (!parsed) {
+    appendOwnerTextAudit(verifiedPhone.venueKey, {
+      raw_message: message,
+      phone,
+      received_at: receivedAt,
+      applied: false,
+      reason: 'unsupported_command',
+    });
+    return sendOwnerTextResponse(req, res, 400, {
+      error: 'Unsupported text command.',
+      reply: 'Use OPEN 10, CLOSED, REOPEN 6, or MON-FRI 11-9.',
+    });
+  }
+
+  const phoneLast4 = phone.slice(-4);
+
+  if (parsed.type === 'schedule_update') {
+    const scheduleUpdate = {
+      type: parsed.type,
+      received_at: receivedAt,
+      raw_message: message,
+      phone_last4: phoneLast4,
+      schedule_label: parsed.scheduleLabel,
+    };
+
+    ownerTextScheduleStore.set(verifiedPhone.venueKey, {
+      received_at: receivedAt,
+      raw_message: message,
+      phone_last4: phoneLast4,
+      hour_blocks: parsed.hourBlocks,
+      closed_days: parsed.closedDays,
+      schedule_label: parsed.scheduleLabel,
+    });
+    ownerTextUpdateStore.set(verifiedPhone.venueKey, scheduleUpdate);
+    appendOwnerTextAudit(verifiedPhone.venueKey, {
+      ...scheduleUpdate,
+      phone,
+      applied: true,
+    });
+
+    if (dbClient.isDbAvailable()) {
+      try {
+        await dbClient.ingestVenue({
+          name: claim.venueName,
+          url: claim.venueUrl,
+          hoursSource: 'venue_claimed_sms',
+          hourBlocks: parsed.hourBlocks,
+          raw_scrape_payload: {
+            owner_text_update: true,
+            channel: 'sms',
+            action: parsed.type,
+            raw_message: message,
+            phone_last4: phoneLast4,
+            received_at: receivedAt.toISOString(),
+            schedule_label: parsed.scheduleLabel,
+            closed_days: parsed.closedDays,
+          },
+        });
+      } catch (_dbErr) {
+        // Best-effort
+      }
+    }
+
+    return sendOwnerTextResponse(req, res, 200, {
+      ok: true,
+      action: parsed.type,
+      reply: `Saved owner schedule: ${parsed.scheduleLabel}.`,
+      schedule_label: parsed.scheduleLabel,
+    });
+  }
+
+  if (parsed.type === 'open_until') {
+    emergencyClosureStore.delete(verifiedPhone.venueKey);
+
+    const liveUpdate = {
+      type: parsed.type,
+      received_at: receivedAt,
+      raw_message: message,
+      phone_last4: phoneLast4,
+      close_at: parsed.closeAt,
+      display_close_at: formatDisplayTime(parsed.closeAt),
+    };
+
+    ownerTextUpdateStore.set(verifiedPhone.venueKey, liveUpdate);
+    appendOwnerTextAudit(verifiedPhone.venueKey, {
+      ...liveUpdate,
+      phone,
+      applied: true,
+    });
+
+    if (dbClient.isDbAvailable()) {
+      try {
+        await dbClient.ingestVenue({
+          name: claim.venueName,
+          url: claim.venueUrl,
+          hoursSource: 'venue_claimed_sms',
+          hourBlocks: [{
+            day: receivedAt.getDay(),
+            open: (receivedAt.getHours() * 60) + receivedAt.getMinutes(),
+            close: parsed.closeMinutes,
+          }],
+          raw_scrape_payload: {
+            owner_text_update: true,
+            channel: 'sms',
+            action: parsed.type,
+            raw_message: message,
+            phone_last4: phoneLast4,
+            received_at: receivedAt.toISOString(),
+            close_at: parsed.closeAt.toISOString(),
+          },
+        });
+      } catch (_dbErr) {
+        // Best-effort
+      }
+    }
+
+    return sendOwnerTextResponse(req, res, 200, {
+      ok: true,
+      action: parsed.type,
+      reply: `Marked open until ${formatDisplayTime(parsed.closeAt)}.`,
+    });
+  }
+
+  const closedUntil = parsed.reopenAt || (() => {
+    const nextMorning = new Date(receivedAt);
+    // Mirror the existing owner emergency-closure behavior: if no explicit
+    // reopen time is supplied by text, keep the venue closed through the
+    // overnight window and automatically reopen at 06:00 the next morning.
+    nextMorning.setDate(nextMorning.getDate() + 1);
+    nextMorning.setHours(6, 0, 0, 0);
+    return nextMorning;
+  })();
+
+  emergencyClosureStore.set(verifiedPhone.venueKey, {
+    reason: 'Owner text update',
+    closed_until: closedUntil,
+  });
+
+  const liveUpdate = {
+    type: parsed.type,
+    received_at: receivedAt,
+    raw_message: message,
+    phone_last4: phoneLast4,
+    closed_until: closedUntil,
+    display_closed_until: formatDisplayTime(closedUntil),
+  };
+
+  ownerTextUpdateStore.set(verifiedPhone.venueKey, liveUpdate);
+  appendOwnerTextAudit(verifiedPhone.venueKey, {
+    ...liveUpdate,
+    phone,
+    applied: true,
+  });
+
+  if (dbClient.isDbAvailable()) {
+    try {
+      await dbClient.ingestVenue({
+        name: claim.venueName,
+        url: claim.venueUrl,
+        hoursSource: 'venue_claimed_sms',
+        hourBlocks: [],
+        raw_scrape_payload: {
+          owner_text_update: true,
+          channel: 'sms',
+          action: parsed.type,
+          raw_message: message,
+          phone_last4: phoneLast4,
+          received_at: receivedAt.toISOString(),
+          emergency_closure: true,
+          closed_until: closedUntil.toISOString(),
+        },
+      });
+    } catch (_dbErr) {
+      // Best-effort
+    }
+  }
+
+  return sendOwnerTextResponse(req, res, 200, {
+    ok: true,
+    action: parsed.type,
+    reply: `Marked closed until ${formatDisplayTime(closedUntil)}.`,
+    closed_until: closedUntil.toISOString(),
+  });
 });
 
 /**

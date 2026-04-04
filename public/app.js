@@ -291,6 +291,21 @@ function buildCard(venue) {
     confidenceHtml = `<div class="venue-confidence"><span class="confidence-badge">${pct}% confidence</span> via ${escapeHtml(venue.kitchen_status.verified_via || 'unknown')}</div>`;
   }
 
+  let ownerTextHtml = '';
+  const ownerTextUpdate = venue.kitchen_status && venue.kitchen_status.owner_text_update;
+  if (ownerTextUpdate && ownerTextUpdate.recent) {
+    const updatedAgo = relativeTime(ownerTextUpdate.updated_at);
+    if (ownerTextUpdate.type === 'schedule_update' && ownerTextUpdate.schedule_label) {
+      ownerTextHtml = `<div class="venue-confidence">📱 Owner updated weekly schedule · <strong>${escapeHtml(ownerTextUpdate.schedule_label)}</strong> · updated ${escapeHtml(updatedAgo)}</div>`;
+    } else if (ownerTextUpdate.type === 'open_until' && ownerTextUpdate.display_closes_at) {
+      ownerTextHtml = `<div class="venue-confidence">📱 Text-confirmed open until <strong>${escapeHtml(ownerTextUpdate.display_closes_at)}</strong> · updated ${escapeHtml(updatedAgo)}</div>`;
+    } else if (ownerTextUpdate.type === 'closed_until' && ownerTextUpdate.display_closed_until) {
+      ownerTextHtml = `<div class="venue-confidence">📱 Owner texted closed until <strong>${escapeHtml(ownerTextUpdate.display_closed_until)}</strong> · updated ${escapeHtml(updatedAgo)}</div>`;
+    } else {
+      ownerTextHtml = `<div class="venue-confidence">📱 Owner text update received ${escapeHtml(updatedAgo)}</div>`;
+    }
+  }
+
   // Affiliate links (delivery + reservation)
   let affiliateHtml = '';
   if (venue.affiliate_links) {
@@ -355,6 +370,7 @@ function buildCard(venue) {
     ${venue.description ? `<p class="venue-desc">${escapeHtml(venue.description)}</p>` : ''}
     ${hoursHtml}
     ${confidenceHtml}
+    ${ownerTextHtml}
     ${contactHtml}
     ${affiliateHtml}
     ${hoursTableHtml}
@@ -463,6 +479,21 @@ function minsToTime(mins) {
   const suffix = h < 12 ? 'AM' : 'PM';
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+function relativeTime(isoString) {
+  if (!isoString) return 'recently';
+  const then = new Date(isoString);
+  if (Number.isNaN(then.getTime())) return 'recently';
+  const diffMinutes = Math.max(0, Math.round((Date.now() - then.getTime()) / 60000));
+  if (diffMinutes < 1) return 'just now';
+  if (diffMinutes === 1) return '1 min ago';
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours === 1) return '1 hour ago';
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
 }
 
 function escapeHtml(str) {

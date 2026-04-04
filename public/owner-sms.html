@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Owner SMS Setup — Still Serving Food</title>
+    <meta name="description" content="Verify a business phone number and configure owner text updates for kitchen hours." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/" class="site-nav-brand">🍔 Still Serving Food</a>
+      <div class="site-nav-links">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/search.html">Search</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <h1>📱 Owner SMS setup</h1>
+      <p class="tagline">Verify one phone number for your claimed venue, then text kitchen-hour changes straight into search.</p>
+    </header>
+
+    <main class="owner-sms-page">
+      <section class="owner-sms-card">
+        <h2>1. Paste your owner token</h2>
+        <p class="owner-sms-copy">Use the token returned from the business activation flow. If you opened this page from the activation link, it should already be filled in.</p>
+        <form id="token-form" class="owner-sms-form">
+          <label for="token-input">Business token</label>
+          <textarea id="token-input" rows="4" placeholder="Paste your owner token"></textarea>
+          <button type="submit" class="owner-sms-btn">Save token</button>
+        </form>
+      </section>
+
+      <section class="owner-sms-grid">
+        <section class="owner-sms-card">
+          <h2>2. Verify your phone</h2>
+          <form id="phone-form" class="owner-sms-form">
+            <label for="phone-input">Phone number</label>
+            <input id="phone-input" type="tel" placeholder="+1 555 123 4567" />
+            <button type="submit" class="owner-sms-btn">Send verification code</button>
+          </form>
+
+          <form id="verify-form" class="owner-sms-form">
+            <label for="code-input">Verification code</label>
+            <input id="code-input" type="text" inputmode="numeric" placeholder="6-digit code" />
+            <button type="submit" class="owner-sms-btn owner-sms-btn-secondary">Verify phone</button>
+          </form>
+
+          <div id="owner-status" class="owner-sms-status" aria-live="polite"></div>
+        </section>
+
+        <section class="owner-sms-card">
+          <h2>3. Point Twilio at the webhook</h2>
+          <div class="owner-sms-copy">
+            <p><strong>Webhook URL</strong></p>
+            <code id="webhook-url">/api/business/inbound-text</code>
+            <p class="owner-sms-note">If you use <code>OWNER_TEXT_WEBHOOK_SECRET</code> to secure the webhook in production, append <code>?secret=YOUR_SECRET</code> to the webhook URL in Twilio.</p>
+            <p class="owner-sms-note">Twilio form fields <code>From</code> and <code>Body</code> are supported and replies come back as TwiML automatically.</p>
+          </div>
+        </section>
+      </section>
+
+      <section class="owner-sms-card">
+        <h2>Text commands you can send</h2>
+        <div class="owner-sms-command-list">
+          <div><strong>Fast mode</strong><br />OPEN 10<br />CLOSED<br />REOPEN 6</div>
+          <div><strong>Schedule mode</strong><br />MON-FRI 11-9<br />SAT 12-11<br />SUN CLOSED</div>
+        </div>
+      </section>
+    </main>
+
+    <script src="owner-sms.js"></script>
+  </body>
+  </html>
