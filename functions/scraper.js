@@ -16,11 +16,32 @@ const { parseHours, isCurrentlyServing, formatTime, detect24Hours, computeLocalN
 // Relevance filtering — keep only commercial restaurant/food-truck pages
 // ---------------------------------------------------------------------------
 
-/** Individual social media posts (not business pages). */
-const SOCIAL_POST_URL_RE = /instagram\.com\/p\/|twitter\.com\/[^/]+\/status\/|x\.com\/[^/]+\/status\//i;
+/** Individual social media posts, reels, stories, and threads (not business pages). */
+const SOCIAL_POST_URL_RE =
+  /instagram\.com\/(?:p|reel|tv|stories)\/|twitter\.com\/[^/]+\/status\/|x\.com\/[^/]+\/status\//i;
 
-/** Aggregator search-result pages (not individual business listings). */
-const AGGREGATOR_SEARCH_URL_RE = /yelp\.com\/search|tripadvisor\.com\/Restaurants-g/i;
+/** Aggregator search-result pages (not individual business listings).
+ *  Matches yelp.com, yelp.ca, yelp.co.uk, yelp.com.au, etc. and the
+ *  equivalent TripAdvisor restaurant-list pages across all regional domains. */
+const AGGREGATOR_SEARCH_URL_RE =
+  /yelp\.[a-z]{2,}(?:\.[a-z]{2,})?\/search|tripadvisor\.[a-z]{2,}(?:\.[a-z]{2,})?\/Restaurants-g/i;
+
+/**
+ * Noisy social-platform pages that are not business listings:
+ *   - Facebook group, event, story, or post/permalink pages
+ *   - Reddit threads or subreddit pages
+ *   - Quora question pages
+ *   - Google Maps search / place results (structured data is unavailable)
+ */
+const SOCIAL_NOISE_RE =
+  /facebook\.com\/(?:groups|events|stories|watch)\/|facebook\.com\/[^/]+\/(?:posts|videos|photos|permalink)\/|reddit\.com\/r\/|quora\.com\//i;
+
+/**
+ * City government, parking authority, and transit-agency pages that often
+ * mention "Open 24/7" in the context of garages and transit, not food.
+ */
+const CITY_PARKING_RE =
+  /\/parking\/|\/garages?[-/]lots?|\.gov\/|\.gov$|cityof\w+\.(?:com|org|net)|\/transit\/|\/transportation\//i;
 
 /**
  * Link-aggregator pages (LinkTree, Taplink, Beacons.ai, etc.) that act as
@@ -67,6 +88,8 @@ function isVenueRelevant(raw) {
 
   if (SOCIAL_POST_URL_RE.test(url)) return false;
   if (AGGREGATOR_SEARCH_URL_RE.test(url)) return false;
+  if (SOCIAL_NOISE_RE.test(url)) return false;
+  if (CITY_PARKING_RE.test(url)) return false;
   if (LISTICLE_URL_RE.test(url)) return false;
   // Link-aggregator hub pages contain no hours; they will be handled by
   // maybeFollowLinkAggregator() after the initial venue list is built.
@@ -195,7 +218,8 @@ function buildQuery(params = {}) {
   // Use specific food-service-hours phrases that appear on actual restaurant
   // pages, Yelp listings, TripAdvisor restaurant pages, menu-aggregator sites
   // (MenuPages, Allmenus, SinglePlatform), and Facebook business pages — not
-  // in listicle articles.
+  // in listicle articles.  "24/7" is intentionally omitted because it is used
+  // by parking garages and transit hubs, making it too broad to disambiguate.
   const foodHoursPhrases = [
     '"food hours"',
     '"kitchen hours"',
@@ -203,7 +227,6 @@ function buildQuery(params = {}) {
     '"serving hours"',
     '"hot food hours"',
     '"open 24 hours"',
-    '"24/7"',
     '"delivery hours"',
     '"pickup hours"',
   ];

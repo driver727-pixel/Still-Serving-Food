@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { searchVenues, scrapeVenue } = require('./scraper');
 const { runHybridPipeline } = require('./hybridPipeline');
+const { searchOsmVenues, enrichVenuesWithOsmData, buildVenuesFromOsmData } = require('./osmClient');
 const venueStore = require('./venueStore');
 const { generateAffiliateLinks } = require('./affiliateLinks');
 const {
@@ -628,11 +629,44 @@ app.get('/api/search', async (req, res) => {
         { limit: parseInt(limit, 10) || 10, utcOffsetMinutes: parsedUtcOffset },
       );
     } else {
-      // Legacy pipeline: Firecrawl web search
-      venues = await searchVenues(
-        { location: location || '', name: name || '', servingUntil: servingUntil || '' },
-        { limit: parseInt(limit, 10) || 10, utcOffsetMinutes: parsedUtcOffset },
-      );
+      // Legacy pipeline: Firecrawl web search, supplemented by OSM data.
+      // OSM (OpenStreetMap via Overpass API) is free, requires no API key, and
+      // reliably surfaces well-known venues — including 24-hour chains — that
+      // Firecrawl web search may miss because their pages lack kitchen-hours
+      // phrases.  We run both in parallel, then:
+      //   1. Enrich any Firecrawl-found venues with OSM hours (if they lack hours)
+      //   2. Add OSM-only venues (those not found by Firecrawl) to the list
+      const searchLimit = parseInt(limit, 10) || 10;
+      const { computeLocalNow } = require('./hoursParser');
+      const localNow = computeLocalNow(parsedUtcOffset);
+
+      // Run Firecrawl and OSM in parallel; OSM failure is non-fatal
+      const [firecrawlVenues, osmVenues] = await Promise.all([
+        searchVenues(
+          { location: location || '', name: name || '', servingUntil: servingUntil || '' },
+          { limit: searchLimit, utcOffsetMinutes: parsedUtcOffset },
+        ),
+        hasLocation
+          ? searchOsmVenues({
+              location: location.trim(),
+              limit: Math.max(searchLimit * 3, 40),
+            }).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+
+      // Step 1: enrich Firecrawl venues that have no hours using OSM data
+      const enriched = enrichVenuesWithOsmData(firecrawlVenues, osmVenues, localNow);
+
+      // Step 2: build new Venue objects from OSM, then add those whose names
+      // are not already represented in the Firecrawl results
+      function normName(n) {
+        return (n || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      }
+      const knownNames = new Set(enriched.map((v) => normName(v.name)));
+      const osmBuilt = buildVenuesFromOsmData(osmVenues, localNow);
+      const osmOnly = osmBuilt.filter((v) => !knownNames.has(normName(v.name)));
+
+      venues = [...enriched, ...osmOnly];
     }
 
     // Sort order: regular venues first (serving before not-serving), 24-hour chains last.

@@ -228,7 +228,7 @@ function convertOsmOpeningHours(osmHours) {
  * Parse a single OSM element (node or way) into a minimal venue descriptor.
  *
  * @param {object} element  Overpass element
- * @returns {{name:string, lat:number|null, lng:number|null, openingHoursText:string, kitchenHoursText:string}|null}
+ * @returns {{name:string, lat:number|null, lng:number|null, address:string, website:string, openingHoursText:string, kitchenHoursText:string}|null}
  */
 function parseOsmElement(element) {
   const tags = element.tags || {};
@@ -239,10 +239,22 @@ function parseOsmElement(element) {
   const lat = element.center?.lat ?? element.lat ?? null;
   const lng = element.center?.lon ?? element.lon ?? null;
 
+  // Build a human-readable address from OSM addr: tags
+  const addrParts = [];
+  if (tags['addr:housenumber'] && tags['addr:street']) {
+    addrParts.push(`${tags['addr:housenumber']} ${tags['addr:street']}`);
+  } else if (tags['addr:street']) {
+    addrParts.push(tags['addr:street']);
+  }
+  if (tags['addr:city']) addrParts.push(tags['addr:city']);
+  if (tags['addr:state']) addrParts.push(tags['addr:state']);
+
   return {
     name,
     lat,
     lng,
+    address: addrParts.join(', '),
+    website: tags.website || '',
     openingHoursText: tags.opening_hours || '',
     // OSM tag for kitchen-specific hours is `kitchen:opening_hours`
     kitchenHoursText: tags['kitchen:opening_hours'] || '',
@@ -337,11 +349,56 @@ function enrichVenuesWithOsmData(venues, osmVenues, now = new Date()) {
   });
 }
 
+/**
+ * Convert a list of OsmVenueResult objects into full Venue objects suitable
+ * for display in the frontend.  Unlike `enrichVenuesWithOsmData`, this creates
+ * brand-new Venue objects rather than enriching existing ones, allowing OSM
+ * results to be used as a primary data source when no other pipeline data is
+ * available.
+ *
+ * @param {Array<{name,lat,lng,address,website,openingHoursText,kitchenHoursText}>} osmVenues
+ * @param {Date} [now]  Reference time for open/closed determination.
+ * @returns {import('./hoursParser').Venue[]}
+ */
+function buildVenuesFromOsmData(osmVenues, now = new Date()) {
+  const venues = [];
+  for (const osm of osmVenues) {
+    const rawText = osm.kitchenHoursText || osm.openingHoursText;
+    const convertedText = rawText ? convertOsmOpeningHours(rawText) : '';
+    const is24Hours = rawText ? detect24Hours(convertedText) : false;
+    const hourBlocks = rawText ? parseHours(convertedText) : [];
+
+    const status =
+      is24Hours
+        ? { serving: true, opensAt: null, closesAt: null }
+        : hourBlocks.length > 0
+          ? isCurrentlyServing(hourBlocks, now)
+          : { serving: false, opensAt: null, closesAt: null };
+
+    venues.push({
+      name: osm.name,
+      url: osm.website || '',
+      description: osm.address || '',
+      hourBlocks,
+      is24Hours,
+      serving: status.serving,
+      opensAt: status.opensAt != null ? formatTime(status.opensAt) : null,
+      closesAt: status.closesAt != null ? formatTime(status.closesAt) : null,
+      // If no hours data exists at all, prompt the user to call ahead
+      callForHours: !rawText,
+      hoursSource: osm.kitchenHoursText ? 'osm_kitchen' : osm.openingHoursText ? 'osm' : null,
+      scrapedAt: new Date().toISOString(),
+    });
+  }
+  return venues;
+}
+
 module.exports = {
   searchOsmVenues,
   geocodeLocation,
   convertOsmOpeningHours,
   enrichVenuesWithOsmData,
+  buildVenuesFromOsmData,
   parseOsmElement,
   buildBbox,
 };
