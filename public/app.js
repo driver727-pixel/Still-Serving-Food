@@ -374,8 +374,8 @@ function buildCard(venue) {
  * @returns {string} HTML string
  */
 function buildUserReportWidget(venue) {
-  const venueKey   = encodeURIComponent(`${(venue.name || '').trim()}||${(venue.url || '').trim()}`);
-  const storageKey = `ssf_voted_${venueKey}`;
+  const rawKey     = `${(venue.name || '').trim()}||${(venue.url || '').trim()}`;
+  const storageKey = `ssf_voted_${rawKey}`;
   const alreadyVoted = sessionStorage.getItem(storageKey);
 
   let summary = '';

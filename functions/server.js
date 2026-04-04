@@ -117,8 +117,10 @@ function generateToken() {
  * Key: normalised venue key (name + url).
  * Value: array of { is_serving: bool, observed_at: Date }
  *
- * Reports never expire — they accumulate until the process restarts.
- * Each report also contains { is_serving, observed_at }.
+ * Reports accumulate for the lifetime of the process. In a future iteration
+ * a sliding time-window (e.g. last 24 hours) should be applied to prevent
+ * stale crowd data from permanently skewing results. For now the volume of
+ * reports is low enough that unbounded growth is not a practical concern.
  */
 const userReportStore = new Map();
 
@@ -128,6 +130,30 @@ const userReportStore = new Map();
  */
 const userReportRateLimit = new Map();
 const USER_REPORT_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
+ * Rate-limit guard for business management endpoints.
+ * Limits write operations (hours updates, emergency closures) to
+ * one per IP per 60 seconds to prevent abuse of authenticated routes.
+ * Key: `${ip}:${path}`, value: timestamp of last request.
+ */
+const businessActionRateLimit = new Map();
+const BUSINESS_ACTION_COOLDOWN_MS = 60 * 1000;
+
+/**
+ * Check and record a business action rate-limit hit.
+ * Returns true if the request is within the cooldown window (should be blocked).
+ * @param {string} ip
+ * @param {string} path
+ * @returns {boolean}
+ */
+function isBusinessActionRateLimited(ip, path) {
+  const key    = `${ip}:${path}`;
+  const lastAt = businessActionRateLimit.get(key);
+  if (lastAt && Date.now() - lastAt < BUSINESS_ACTION_COOLDOWN_MS) return true;
+  businessActionRateLimit.set(key, Date.now());
+  return false;
+}
 
 /**
  * Return a stable, normalised key for a venue.
@@ -228,9 +254,15 @@ const emergencyClosureStore = new Map();
  * the in-memory copy is a fast-access cache.
  */
 const businessClaimStore = new Map();
-const BUSINESS_CLAIM_PRICE = process.env.BUSINESS_CLAIM_PRICE_ID || 'price_business_claim';
-const BUSINESS_JWT_SECRET  = process.env.BUSINESS_JWT_SECRET || 'business-jwt-secret-change-in-production';
-const BUSINESS_JWT_TTL     = '1y'; // business tokens are long-lived
+const BUSINESS_CLAIM_PRICE_ID = process.env.BUSINESS_CLAIM_PRICE_ID || 'price_business_claim';
+const BUSINESS_JWT_SECRET     = process.env.BUSINESS_JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('BUSINESS_JWT_SECRET must be set in production');
+  }
+  console.warn('[security] BUSINESS_JWT_SECRET not set — using insecure default. Set this env var in production.');
+  return 'business-jwt-secret-change-in-production';
+})();
+const BUSINESS_JWT_TTL = '1y'; // business tokens are long-lived
 
 /**
  * Sign a JWT granting a business owner access to manage their venue.
@@ -282,6 +314,7 @@ app._userReportStore = userReportStore;
 app._userReportRateLimit = userReportRateLimit;
 app._businessClaimStore = businessClaimStore;
 app._emergencyClosureStore = emergencyClosureStore;
+app._businessActionRateLimit = businessActionRateLimit;
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -552,7 +585,7 @@ app.post('/api/business/create-checkout-session', async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{
-        price: BUSINESS_CLAIM_PRICE,
+        price: BUSINESS_CLAIM_PRICE_ID,
         quantity: 1,
       }],
       customer_email: email || undefined,
@@ -605,7 +638,6 @@ app.get('/api/business/activate', async (req, res) => {
       venueUrl,
       paidAt: new Date(),
       stripeSessionId: session.id,
-      emergency_closed_until: null,
     });
 
     const token = signBusinessToken(venueKey, session.id);
@@ -631,6 +663,11 @@ app.post('/api/business/hours', async (req, res) => {
   const owner = verifyBusinessToken(req);
   if (!owner) {
     return res.status(401).json({ error: 'Valid business owner token required.' });
+  }
+
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isBusinessActionRateLimited(ip, '/api/business/hours')) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before updating hours again.' });
   }
 
   const { day_of_week, kitchen_open, kitchen_close } = req.body;
@@ -690,6 +727,11 @@ app.post('/api/business/close-now', async (req, res) => {
     return res.status(401).json({ error: 'Valid business owner token required.' });
   }
 
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isBusinessActionRateLimited(ip, '/api/business/close-now')) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before submitting another closure.' });
+  }
+
   const claim = businessClaimStore.get(owner.venueKey);
   if (!claim) {
     return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
@@ -712,12 +754,10 @@ app.post('/api/business/close-now', async (req, res) => {
     closedUntil.setHours(6, 0, 0, 0);
   }
 
-  claim.emergency_closed_until = closedUntil;
-  businessClaimStore.set(owner.venueKey, claim);
-
   // Record closure in the emergency store — applyUserReportEnrichment checks this
   // on every search response, so cached results will reflect the closure instantly.
   emergencyClosureStore.set(owner.venueKey, { reason: reason || null, closed_until: closedUntil });
+  businessClaimStore.set(owner.venueKey, claim);
 
   // Write an emergency closure log entry to the DB if available
   if (dbClient.isDbAvailable()) {

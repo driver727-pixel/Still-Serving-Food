@@ -28,6 +28,7 @@ beforeEach(() => {
   app._userReportRateLimit.clear();
   app._businessClaimStore.clear();
   app._emergencyClosureStore.clear();
+  app._businessActionRateLimit.clear();
   jest.clearAllMocks();
 });
 
