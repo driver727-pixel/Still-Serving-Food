@@ -8,6 +8,7 @@ const {
   geocodeLocation,
   convertOsmOpeningHours,
   enrichVenuesWithOsmData,
+  buildVenuesFromOsmData,
   parseOsmElement,
   buildBbox,
   searchOsmVenues,
@@ -362,5 +363,138 @@ describe('searchOsmVenues', () => {
   test('propagates geocoding failure', async () => {
     mockGet([]);
     await expect(searchOsmVenues({ location: 'Unknown Place' })).rejects.toThrow(/no results/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseOsmElement — address and website enrichment
+// ---------------------------------------------------------------------------
+describe('parseOsmElement address and website fields', () => {
+  test('builds address from addr: tags', () => {
+    const el = {
+      type: 'node',
+      lat: 43.07,
+      lon: -89.38,
+      tags: {
+        name: "McDonald's",
+        amenity: 'fast_food',
+        'addr:housenumber': '4020',
+        'addr:street': 'Milwaukee St',
+        'addr:city': 'Madison',
+        'addr:state': 'WI',
+        opening_hours: '24/7',
+      },
+    };
+    const result = parseOsmElement(el);
+    expect(result.name).toBe("McDonald's");
+    expect(result.address).toBe('4020 Milwaukee St, Madison, WI');
+    expect(result.openingHoursText).toBe('24/7');
+  });
+
+  test('returns empty address when addr: tags are absent', () => {
+    const el = {
+      type: 'node',
+      lat: 40.7,
+      lon: -73.9,
+      tags: { name: 'Test Cafe', amenity: 'cafe' },
+    };
+    const result = parseOsmElement(el);
+    expect(result.address).toBe('');
+  });
+
+  test('captures website tag', () => {
+    const el = {
+      type: 'node',
+      lat: 40.7,
+      lon: -73.9,
+      tags: { name: 'Test Bar', amenity: 'bar', website: 'https://testbar.com' },
+    };
+    const result = parseOsmElement(el);
+    expect(result.website).toBe('https://testbar.com');
+  });
+
+  test('returns empty website when no website tag', () => {
+    const el = {
+      type: 'node',
+      lat: 40.7,
+      lon: -73.9,
+      tags: { name: 'Test Bar', amenity: 'bar' },
+    };
+    const result = parseOsmElement(el);
+    expect(result.website).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildVenuesFromOsmData — converts OSM results to Venue objects
+// ---------------------------------------------------------------------------
+describe('buildVenuesFromOsmData', () => {
+  test('converts OSM venues with opening_hours into Venue objects', () => {
+    const osmVenues = [
+      {
+        name: 'Test Restaurant',
+        address: '1 Main St, Brooklyn, NY',
+        website: 'https://testrestaurant.com',
+        openingHoursText: 'Mo-Fr 11:00-22:00',
+        kitchenHoursText: '',
+      },
+    ];
+    const result = buildVenuesFromOsmData(osmVenues);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Test Restaurant');
+    expect(result[0].description).toBe('1 Main St, Brooklyn, NY');
+    expect(result[0].url).toBe('https://testrestaurant.com');
+    expect(result[0].hourBlocks.length).toBeGreaterThan(0);
+    expect(result[0].hoursSource).toBe('osm');
+    expect(result[0].callForHours).toBe(false);
+  });
+
+  test('sets is24Hours and serving=true for 24/7 venues', () => {
+    const osmVenues = [
+      {
+        name: "McDonald's",
+        address: '4020 Milwaukee St, Madison, WI',
+        website: '',
+        openingHoursText: '24/7',
+        kitchenHoursText: '',
+      },
+    ];
+    const result = buildVenuesFromOsmData(osmVenues);
+    expect(result[0].is24Hours).toBe(true);
+    expect(result[0].serving).toBe(true);
+    expect(result[0].hoursSource).toBe('osm');
+  });
+
+  test('prefers kitchenHoursText and sets hoursSource to osm_kitchen', () => {
+    const osmVenues = [
+      {
+        name: 'Grill House',
+        address: '',
+        website: '',
+        openingHoursText: 'Mo-Fr 10:00-23:00',
+        kitchenHoursText: 'Mo-Fr 11:00-21:00',
+      },
+    ];
+    const result = buildVenuesFromOsmData(osmVenues);
+    expect(result[0].hoursSource).toBe('osm_kitchen');
+  });
+
+  test('sets callForHours=true when no hours text is available', () => {
+    const osmVenues = [
+      {
+        name: 'Mystery Cafe',
+        address: '',
+        website: '',
+        openingHoursText: '',
+        kitchenHoursText: '',
+      },
+    ];
+    const result = buildVenuesFromOsmData(osmVenues);
+    expect(result[0].callForHours).toBe(true);
+    expect(result[0].hoursSource).toBeNull();
+  });
+
+  test('returns empty array for empty input', () => {
+    expect(buildVenuesFromOsmData([])).toEqual([]);
   });
 });

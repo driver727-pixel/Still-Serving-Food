@@ -240,6 +240,78 @@ describe('isVenueRelevant', () => {
     };
     expect(isVenueRelevant(raw)).toBe(true);
   });
+
+  test('rejects Instagram reel URLs', () => {
+    const raw = {
+      url: 'https://www.instagram.com/reel/DSDuUwSkoPD/',
+      metadata: { title: 'Reel' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects Instagram stories URLs', () => {
+    const raw = {
+      url: 'https://www.instagram.com/stories/someuser/123/',
+      metadata: { title: 'Story' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects international Yelp search pages (yelp.ca)', () => {
+    const raw = {
+      url: 'https://www.yelp.ca/search?find_desc=Open+24+Hours+Restaurant&find_loc=Madison%2C+WI',
+      metadata: { title: 'Open 24 Hours Restaurant Madison WI - Yelp' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects international Yelp search pages (yelp.co.uk)', () => {
+    const raw = {
+      url: 'https://www.yelp.co.uk/search?find_desc=restaurants&find_loc=London',
+      metadata: { title: 'Restaurants in London - Yelp' },
+      markdown: '',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects Facebook group post URLs', () => {
+    const raw = {
+      url: 'https://www.facebook.com/groups/madisonfood/posts/846889850658023/',
+      metadata: { title: '24/7 diners in Madison' },
+      markdown: 'Hyvee market cafe is open 24/7 I think.',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects Reddit thread URLs', () => {
+    const raw = {
+      url: 'https://www.reddit.com/r/madisonwi/comments/abc123/best_late_night_food/',
+      metadata: { title: 'Best late night food in Madison - Reddit' },
+      markdown: 'restaurant bar food late night',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('rejects city government parking pages', () => {
+    const raw = {
+      url: 'https://www.cityofmadison.com/parking/garages-lots/state-street-capitol-garage',
+      metadata: { title: 'State Street Capitol Garage - City of Madison' },
+      markdown: 'Open and enforced 24/7. Vehicles parked here.',
+    };
+    expect(isVenueRelevant(raw)).toBe(false);
+  });
+
+  test('accepts a standard restaurant Yelp business page', () => {
+    const raw = {
+      url: 'https://yelp.ca/biz/my-restaurant-madison',
+      metadata: { title: 'My Restaurant - Yelp' },
+      markdown: 'Kitchen hours...',
+    };
+    expect(isVenueRelevant(raw)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -270,6 +342,11 @@ describe('buildQuery', () => {
   test('includes food-hours phrases', () => {
     const q = buildQuery({ location: 'Brooklyn, NY' });
     expect(q).toContain('"kitchen hours"');
+  });
+
+  test('does not include "24/7" phrase (too broad — matches parking garages)', () => {
+    const q = buildQuery({ location: 'Brooklyn, NY' });
+    expect(q).not.toContain('"24/7"');
   });
 });
 
