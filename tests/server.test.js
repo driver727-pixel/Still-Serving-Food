@@ -677,7 +677,7 @@ describe('Owner text updates', () => {
   });
 
   test('applies schedule-mode text updates to cached search results', async () => {
-    jest.useFakeTimers();
+    jest.useFakeTimers({ doNotFake: ['setTimeout', 'setInterval', 'setImmediate', 'nextTick'] });
     try {
       jest.setSystemTime(new Date('2026-04-04T12:00:00Z'));
 

@@ -189,6 +189,17 @@ describe('Server API end-to-end', () => {
     venueStore.clear();
     app._searchCounters.clear();
     app._adTokens.clear();
+    app._userReportStore.clear();
+    app._userReportRateLimit.clear();
+    app._businessClaimStore.clear();
+    app._emergencyClosureStore.clear();
+    app._businessActionRateLimit.clear();
+    app._ownerPhoneVerificationStore.clear();
+    app._verifiedOwnerPhoneStore.clear();
+    app._ownerTextUpdateStore.clear();
+    app._ownerTextScheduleStore.clear();
+    app._ownerTextAuditStore.clear();
+    app._ownerTextIngressRateLimit.clear();
     jest.clearAllMocks();
   });
 
