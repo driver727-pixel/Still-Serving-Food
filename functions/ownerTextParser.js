@@ -2,6 +2,9 @@
 
 const { parseTime, expandDayRange, formatTime } = require('./hoursParser');
 
+// Matches simple SMS time tokens like "10", "10:30", "10am", or "10:30 pm".
+const TIME_TOKEN_RE = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/;
+
 function normalizePhone(phone) {
   if (typeof phone !== 'string') return null;
   const digits = phone.replace(/\D/g, '');
@@ -11,7 +14,7 @@ function normalizePhone(phone) {
 
 function parseExplicitTime(token) {
   const trimmed = token.trim().toLowerCase();
-  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  const match = trimmed.match(TIME_TOKEN_RE);
   if (!match) return null;
 
   let hour = parseInt(match[1], 10);
@@ -38,7 +41,7 @@ function chooseNextOccurrence(token, now) {
   const explicitMinutes = parseExplicitTime(token);
   if (explicitMinutes === null) return null;
 
-  const match = token.trim().toLowerCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  const match = token.trim().toLowerCase().match(TIME_TOKEN_RE);
   const meridiem = match && match[3];
 
   let candidates = [explicitMinutes];
