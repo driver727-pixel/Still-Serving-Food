@@ -841,38 +841,39 @@ app.get('/api/business/activate', async (req, res) => {
  * Body: { "phone": "+15551234567" }
  */
 app.post('/api/business/text-number', (req, res) => {
-    const owner = verifyBusinessToken(req);
-    if (!owner) {
-      return res.status(401).json({ error: 'Valid business owner token required.' });
-    }
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    if (isBusinessActionRateLimited(ip, '/api/business/text-number')) {
-      return res.status(429).json({ error: 'Too many requests. Please wait before requesting another phone verification.' });
-    }
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isBusinessActionRateLimited(ip, '/api/business/text-number')) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before requesting another phone verification.' });
+  }
 
-    const claim = businessClaimStore.get(owner.venueKey);
-    if (!claim) {
-      return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
-    }
+  const owner = verifyBusinessToken(req);
+  if (!owner) {
+    return res.status(401).json({ error: 'Valid business owner token required.' });
+  }
 
-    const phone = normalizePhone(req.body.phone);
-    if (!phone) {
-      return res.status(400).json({ error: 'phone must be a valid phone number' });
-    }
+  const claim = businessClaimStore.get(owner.venueKey);
+  if (!claim) {
+    return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
+  }
 
-    const code = generateVerificationCode();
-    ownerPhoneVerificationStore.set(owner.venueKey, {
-      phone,
-      code,
-      requested_at: new Date(),
-    });
+  const phone = normalizePhone(req.body.phone);
+  if (!phone) {
+    return res.status(400).json({ error: 'phone must be a valid phone number' });
+  }
 
-    return res.json({
-      ok: true,
-      message: 'Verification code generated. Texting updates stay locked until this number is verified.',
-      phone,
-      verification_code: process.env.NODE_ENV === 'production' ? undefined : code,
-    });
+  const code = generateVerificationCode();
+  ownerPhoneVerificationStore.set(owner.venueKey, {
+    phone,
+    code,
+    requested_at: new Date(),
+  });
+
+  return res.json({
+    ok: true,
+    message: 'Verification code generated. Texting updates stay locked until this number is verified.',
+    phone,
+    verification_code: process.env.NODE_ENV === 'production' ? undefined : code,
+  });
 });
 
 /**
@@ -881,41 +882,42 @@ app.post('/api/business/text-number', (req, res) => {
  * Body: { "phone": "+15551234567", "code": "123456" }
  */
 app.post('/api/business/text-number/verify', (req, res) => {
-    const owner = verifyBusinessToken(req);
-    if (!owner) {
-      return res.status(401).json({ error: 'Valid business owner token required.' });
-    }
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    if (isBusinessActionRateLimited(ip, '/api/business/text-number/verify')) {
-      return res.status(429).json({ error: 'Too many requests. Please wait before trying to verify this phone number again.' });
-    }
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (isBusinessActionRateLimited(ip, '/api/business/text-number/verify')) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before trying to verify this phone number again.' });
+  }
 
-    const claim = businessClaimStore.get(owner.venueKey);
-    if (!claim) {
-      return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
-    }
+  const owner = verifyBusinessToken(req);
+  if (!owner) {
+    return res.status(401).json({ error: 'Valid business owner token required.' });
+  }
 
-    const pending = ownerPhoneVerificationStore.get(owner.venueKey);
-    const phone = normalizePhone(req.body.phone);
-    const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
+  const claim = businessClaimStore.get(owner.venueKey);
+  if (!claim) {
+    return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
+  }
 
-    if (!pending || !phone || pending.phone !== phone || pending.code !== code) {
-      return res.status(400).json({ error: 'Invalid phone verification attempt.' });
-    }
+  const pending = ownerPhoneVerificationStore.get(owner.venueKey);
+  const phone = normalizePhone(req.body.phone);
+  const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
 
-    const verifiedAt = new Date();
-    verifiedOwnerPhoneStore.set(phone, {
-      venueKey: owner.venueKey,
-      verified_at: verifiedAt,
-    });
-    ownerPhoneVerificationStore.delete(owner.venueKey);
-    businessClaimStore.set(owner.venueKey, {
-      ...claim,
-      verifiedPhone: phone,
-      verifiedPhoneAt: verifiedAt,
-    });
+  if (!pending || !phone || pending.phone !== phone || pending.code !== code) {
+    return res.status(400).json({ error: 'Invalid phone verification attempt.' });
+  }
 
-    return res.json({ ok: true, phone, message: 'Phone number verified for owner text updates.' });
+  const verifiedAt = new Date();
+  verifiedOwnerPhoneStore.set(phone, {
+    venueKey: owner.venueKey,
+    verified_at: verifiedAt,
+  });
+  ownerPhoneVerificationStore.delete(owner.venueKey);
+  businessClaimStore.set(owner.venueKey, {
+    ...claim,
+    verifiedPhone: phone,
+    verifiedPhoneAt: verifiedAt,
+  });
+
+  return res.json({ ok: true, phone, message: 'Phone number verified for owner text updates.' });
 });
 
 /**
