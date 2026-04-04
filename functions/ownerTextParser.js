@@ -59,7 +59,6 @@ function chooseNextOccurrence(token, now) {
   }
 
   const date = new Date(now);
-  date.setSeconds(0, 0);
   date.setHours(Math.floor(chosen / 60), chosen % 60, 0, 0);
   if (date <= now) {
     date.setDate(date.getDate() + 1);

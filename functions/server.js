@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { searchVenues, scrapeVenue } = require('./scraper');
 const { runHybridPipeline } = require('./hybridPipeline');
@@ -172,7 +173,7 @@ function isOwnerTextRateLimited(phone) {
 }
 
 function generateVerificationCode() {
-  return String(Math.floor(100000 + (Math.random() * 900000)));
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 function formatDisplayTime(date) {
@@ -186,6 +187,30 @@ function appendOwnerTextAudit(venueKey, event) {
   const existing = ownerTextAuditStore.get(venueKey) || [];
   existing.push(event);
   ownerTextAuditStore.set(venueKey, existing.slice(-20));
+}
+
+function createBusinessRateLimitMiddleware(pathName, message) {
+  return (req, res, next) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    if (isBusinessActionRateLimited(ip, pathName)) {
+      return res.status(429).json({ error: message });
+    }
+    return next();
+  };
+}
+
+function buildOwnerTextSummary(ownerTextUpdate) {
+  if (!ownerTextUpdate) return null;
+  return {
+    type: ownerTextUpdate.type,
+    updated_at: ownerTextUpdate.received_at.toISOString(),
+    phone_last4: ownerTextUpdate.phone_last4,
+    closes_at: ownerTextUpdate.close_at ? ownerTextUpdate.close_at.toISOString() : null,
+    display_closes_at: ownerTextUpdate.display_close_at || null,
+    closed_until: ownerTextUpdate.closed_until ? ownerTextUpdate.closed_until.toISOString() : null,
+    display_closed_until: ownerTextUpdate.display_closed_until || null,
+    recent: true,
+  };
 }
 
 /**
@@ -237,14 +262,7 @@ function applyUserReportEnrichment(venues) {
           verified_via: hasFreshOwnerText ? 'owner_text' : 'venue_claimed',
           emergency_closure: true,
           emergency_reason: closure.reason || null,
-          owner_text_update: hasFreshOwnerText ? {
-            type: ownerTextUpdate.type,
-            updated_at: ownerTextUpdate.received_at.toISOString(),
-            phone_last4: ownerTextUpdate.phone_last4,
-            closed_until: ownerTextUpdate.closed_until ? ownerTextUpdate.closed_until.toISOString() : null,
-            display_closed_until: ownerTextUpdate.display_closed_until || null,
-            recent: true,
-          } : null,
+          owner_text_update: hasFreshOwnerText ? buildOwnerTextSummary(ownerTextUpdate) : null,
           user_report_summary: null,
         },
       };
@@ -262,14 +280,7 @@ function applyUserReportEnrichment(venues) {
           confidence_score: 1.0,
           is_verified: true,
           verified_via: 'owner_text',
-          owner_text_update: {
-            type: ownerTextUpdate.type,
-            updated_at: ownerTextUpdate.received_at.toISOString(),
-            phone_last4: ownerTextUpdate.phone_last4,
-            closes_at: ownerTextUpdate.close_at.toISOString(),
-            display_closes_at: ownerTextUpdate.display_close_at,
-            recent: true,
-          },
+          owner_text_update: buildOwnerTextSummary(ownerTextUpdate),
           user_report_summary: null,
         },
       };
@@ -283,16 +294,7 @@ function applyUserReportEnrichment(venues) {
         ...v,
         kitchen_status: {
           ...v.kitchen_status,
-          owner_text_update: {
-            type: ownerTextUpdate.type,
-            updated_at: ownerTextUpdate.received_at.toISOString(),
-            phone_last4: ownerTextUpdate.phone_last4,
-            closes_at: ownerTextUpdate.close_at ? ownerTextUpdate.close_at.toISOString() : null,
-            display_closes_at: ownerTextUpdate.display_close_at || null,
-            closed_until: ownerTextUpdate.closed_until ? ownerTextUpdate.closed_until.toISOString() : null,
-            display_closed_until: ownerTextUpdate.display_closed_until || null,
-            recent: true,
-          },
+          owner_text_update: buildOwnerTextSummary(ownerTextUpdate),
         },
       };
     }
@@ -312,16 +314,7 @@ function applyUserReportEnrichment(venues) {
         ...v.kitchen_status,
         confidence_score: confidenceScore,
         is_verified: isConfidenceVerified(confidenceScore),
-        owner_text_update: hasFreshOwnerText ? {
-          type: ownerTextUpdate.type,
-          updated_at: ownerTextUpdate.received_at.toISOString(),
-          phone_last4: ownerTextUpdate.phone_last4,
-          closes_at: ownerTextUpdate.close_at ? ownerTextUpdate.close_at.toISOString() : null,
-          display_closes_at: ownerTextUpdate.display_close_at || null,
-          closed_until: ownerTextUpdate.closed_until ? ownerTextUpdate.closed_until.toISOString() : null,
-          display_closed_until: ownerTextUpdate.display_closed_until || null,
-          recent: true,
-        } : null,
+        owner_text_update: hasFreshOwnerText ? buildOwnerTextSummary(ownerTextUpdate) : null,
         user_report_summary: {
           vote_count: agg.vote_count,
           yes_count: agg.yes_count,
@@ -330,6 +323,9 @@ function applyUserReportEnrichment(venues) {
     };
   });
   enriched.sort((a, b) => {
+    // Only boost fresh owner-text confirmations when they say the venue is
+    // currently serving; recent closure updates remain visible in-place but do
+    // not jump above still-serving venues in the default search ordering.
     const aRecent = a.serving === true && a.kitchen_status && a.kitchen_status.owner_text_update && a.kitchen_status.owner_text_update.recent;
     const bRecent = b.serving === true && b.kitchen_status && b.kitchen_status.owner_text_update && b.kitchen_status.owner_text_update.recent;
     if (aRecent !== bRecent) return aRecent ? -1 : 1;
@@ -762,85 +758,89 @@ app.get('/api/business/activate', async (req, res) => {
  * Headers: Authorization: Bearer <business token>
  * Body: { "phone": "+15551234567" }
  */
-app.post('/api/business/text-number', (req, res) => {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  if (isBusinessActionRateLimited(ip, '/api/business/text-number')) {
-    return res.status(429).json({ error: 'Too many requests. Please wait before requesting another phone verification.' });
-  }
+app.post(
+  '/api/business/text-number',
+  createBusinessRateLimitMiddleware(
+    '/api/business/text-number',
+    'Too many requests. Please wait before requesting another phone verification.',
+  ),
+  (req, res) => {
+    const owner = verifyBusinessToken(req);
+    if (!owner) {
+      return res.status(401).json({ error: 'Valid business owner token required.' });
+    }
 
-  const owner = verifyBusinessToken(req);
-  if (!owner) {
-    return res.status(401).json({ error: 'Valid business owner token required.' });
-  }
+    const claim = businessClaimStore.get(owner.venueKey);
+    if (!claim) {
+      return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
+    }
 
-  const claim = businessClaimStore.get(owner.venueKey);
-  if (!claim) {
-    return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
-  }
+    const phone = normalizePhone(req.body.phone);
+    if (!phone) {
+      return res.status(400).json({ error: 'phone must be a valid phone number' });
+    }
 
-  const phone = normalizePhone(req.body.phone);
-  if (!phone) {
-    return res.status(400).json({ error: 'phone must be a valid phone number' });
-  }
+    const code = generateVerificationCode();
+    ownerPhoneVerificationStore.set(owner.venueKey, {
+      phone,
+      code,
+      requested_at: new Date(),
+    });
 
-  const code = generateVerificationCode();
-  ownerPhoneVerificationStore.set(owner.venueKey, {
-    phone,
-    code,
-    requested_at: new Date(),
-  });
-
-  return res.json({
-    ok: true,
-    message: 'Verification code generated. Texting updates stay locked until this number is verified.',
-    phone,
-    verification_code: process.env.NODE_ENV === 'production' ? undefined : code,
-  });
-});
+    return res.json({
+      ok: true,
+      message: 'Verification code generated. Texting updates stay locked until this number is verified.',
+      phone,
+      verification_code: process.env.NODE_ENV === 'production' ? undefined : code,
+    });
+  },
+);
 
 /**
  * POST /api/business/text-number/verify
  * Headers: Authorization: Bearer <business token>
  * Body: { "phone": "+15551234567", "code": "123456" }
  */
-app.post('/api/business/text-number/verify', (req, res) => {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  if (isBusinessActionRateLimited(ip, '/api/business/text-number/verify')) {
-    return res.status(429).json({ error: 'Too many requests. Please wait before trying to verify this phone number again.' });
-  }
+app.post(
+  '/api/business/text-number/verify',
+  createBusinessRateLimitMiddleware(
+    '/api/business/text-number/verify',
+    'Too many requests. Please wait before trying to verify this phone number again.',
+  ),
+  (req, res) => {
+    const owner = verifyBusinessToken(req);
+    if (!owner) {
+      return res.status(401).json({ error: 'Valid business owner token required.' });
+    }
 
-  const owner = verifyBusinessToken(req);
-  if (!owner) {
-    return res.status(401).json({ error: 'Valid business owner token required.' });
-  }
+    const claim = businessClaimStore.get(owner.venueKey);
+    if (!claim) {
+      return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
+    }
 
-  const claim = businessClaimStore.get(owner.venueKey);
-  if (!claim) {
-    return res.status(403).json({ error: 'No active claim found for this venue. Please complete payment first.' });
-  }
+    const pending = ownerPhoneVerificationStore.get(owner.venueKey);
+    const phone = normalizePhone(req.body.phone);
+    const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
 
-  const pending = ownerPhoneVerificationStore.get(owner.venueKey);
-  const phone = normalizePhone(req.body.phone);
-  const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
+    if (!pending || !phone || pending.phone !== phone || pending.code !== code) {
+      return res.status(400).json({ error: 'Invalid phone verification attempt.' });
+    }
 
-  if (!pending || !phone || pending.phone !== phone || pending.code !== code) {
-    return res.status(400).json({ error: 'Invalid phone verification attempt.' });
-  }
+    const verifiedAt = new Date();
+    verifiedOwnerPhoneStore.set(phone, {
+      venueKey: owner.venueKey,
+      verified_at: verifiedAt,
+    });
+    ownerPhoneVerificationStore.delete(owner.venueKey);
+    businessClaimStore.set(owner.venueKey, {
+      ...claim,
+      verifiedPhone: phone,
+      verifiedPhoneAt: verifiedAt,
+    });
 
-  const verifiedAt = new Date();
-  verifiedOwnerPhoneStore.set(phone, {
-    venueKey: owner.venueKey,
-    verified_at: verifiedAt,
-  });
-  ownerPhoneVerificationStore.delete(owner.venueKey);
-  businessClaimStore.set(owner.venueKey, {
-    ...claim,
-    verifiedPhone: phone,
-    verifiedPhoneAt: verifiedAt,
-  });
-
-  return res.json({ ok: true, phone, message: 'Phone number verified for owner text updates.' });
-});
+    return res.json({ ok: true, phone, message: 'Phone number verified for owner text updates.' });
+  },
+);
 
 /**
  * POST /api/business/inbound-text
