@@ -147,7 +147,20 @@ async function doSearch(params, adToken) {
     if (params.utcOffset !== undefined) qs.set('utcOffset', params.utcOffset);
     if (adToken) qs.set('adToken', adToken);
 
-    const res = await fetch(`${API_BASE}/api/search?${qs.toString()}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 40_000);
+
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/search?${qs.toString()}`, { signal: controller.signal });
+    } catch (fetchErr) {
+      if (fetchErr.name === 'AbortError') {
+        throw new Error('Search is taking longer than expected — please try again.');
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (res.status === 402) {
       // Ad required — server says the free quota is exhausted for this IP

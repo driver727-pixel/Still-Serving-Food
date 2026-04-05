@@ -122,7 +122,7 @@ async function scrapeWithApify(fbUrl, apifyKey) {
   });
 
   // POST to start the run and wait for it to finish (synchronous endpoint)
-  const runUrl = `${APIFY_RUN_URL}?token=${encodeURIComponent(apifyKey)}&waitForFinish=120`;
+  const runUrl = `${APIFY_RUN_URL}?token=${encodeURIComponent(apifyKey)}&waitForFinish=25`;
   const runResponse = await httpPost(runUrl, payload);
 
   const datasetId = runResponse?.data?.defaultDatasetId;

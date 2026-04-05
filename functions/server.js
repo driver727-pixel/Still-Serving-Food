@@ -590,11 +590,16 @@ app.get('/api/search', async (req, res) => {
   // Clamp to a valid range (±840 minutes covers all real-world offsets).
   const parsedUtcOffset = Math.max(-840, Math.min(840, parseInt(utcOffset, 10) || 0));
 
-  // Build a stable cache key from all search dimensions
+  // Build a stable cache key from all search dimensions.
+  // Normalise each segment the same way venueStore.normalise() does so that
+  // equivalent locations like "Winona, Minnesota" and "Winona Minnesota"
+  // resolve to the same cache entry.
+  const normaliseCacheSegment = (s) =>
+    (s || '').toLowerCase().trim().replace(/,/g, '').replace(/\s+/g, ' ').trim();
   const cacheKey = [
-    (location || '').toLowerCase().trim(),
-    (name || '').toLowerCase().trim(),
-    (servingUntil || '').toLowerCase().trim(),
+    normaliseCacheSegment(location),
+    normaliseCacheSegment(name),
+    normaliseCacheSegment(servingUntil),
   ].join('|');
 
   // Serve from cache without counting against the ad-gate quota.
