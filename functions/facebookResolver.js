@@ -29,14 +29,16 @@ const FIRECRAWL_TIMEOUT_MS = 15_000;
  * @returns {Promise<T>}
  */
 function withTimeout(promise, ms) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
       () => reject(new Error(`Firecrawl scrape timed out after ${ms} ms`)),
       ms,
     );
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**

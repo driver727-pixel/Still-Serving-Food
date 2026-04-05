@@ -592,12 +592,13 @@ app.get('/api/search', async (req, res) => {
   const parsedUtcOffset = Math.max(-840, Math.min(840, parseInt(utcOffset, 10) || 0));
 
   // Build a stable cache key from all search dimensions.
-  // Uses the same normalisation as venueStore so that equivalent locations like
-  // "Winona, Minnesota" and "Winona Minnesota" resolve to the same cache entry.
+  // Apply location normalisation (strips commas, collapses whitespace) only to
+  // the location segment so that "Winona, Minnesota" and "Winona Minnesota"
+  // resolve to the same entry.  Name and servingUntil use simple case folding.
   const cacheKey = [
     normaliseLocation(location || ''),
-    normaliseLocation(name || ''),
-    normaliseLocation(servingUntil || ''),
+    (name || '').toLowerCase().trim(),
+    (servingUntil || '').toLowerCase().trim(),
   ].join('|');
 
   // Serve from cache without counting against the ad-gate quota.
