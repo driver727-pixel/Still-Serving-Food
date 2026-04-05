@@ -19,6 +19,8 @@ services:
           property: connectionString
       - key: DB_SSL
         value: "true"
+      - key: BUSINESS_JWT_SECRET
+        sync: false
 
 databases:
   - name: letsnarf-db
