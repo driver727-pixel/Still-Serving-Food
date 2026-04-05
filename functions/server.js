@@ -10,6 +10,7 @@ const { searchVenues, scrapeVenue } = require('./scraper');
 const { runHybridPipeline } = require('./hybridPipeline');
 const { searchOsmVenues, enrichVenuesWithOsmData, buildVenuesFromOsmData } = require('./osmClient');
 const venueStore = require('./venueStore');
+const { normalise: normaliseLocation } = venueStore;
 const { generateAffiliateLinks } = require('./affiliateLinks');
 const {
   isConfidenceVerified,
@@ -591,15 +592,12 @@ app.get('/api/search', async (req, res) => {
   const parsedUtcOffset = Math.max(-840, Math.min(840, parseInt(utcOffset, 10) || 0));
 
   // Build a stable cache key from all search dimensions.
-  // Normalise each segment the same way venueStore.normalise() does so that
-  // equivalent locations like "Winona, Minnesota" and "Winona Minnesota"
-  // resolve to the same cache entry.
-  const normaliseCacheSegment = (s) =>
-    (s || '').toLowerCase().trim().replace(/,/g, '').replace(/\s+/g, ' ').trim();
+  // Uses the same normalisation as venueStore so that equivalent locations like
+  // "Winona, Minnesota" and "Winona Minnesota" resolve to the same cache entry.
   const cacheKey = [
-    normaliseCacheSegment(location),
-    normaliseCacheSegment(name),
-    normaliseCacheSegment(servingUntil),
+    normaliseLocation(location || ''),
+    normaliseLocation(name || ''),
+    normaliseLocation(servingUntil || ''),
   ].join('|');
 
   // Serve from cache without counting against the ad-gate quota.

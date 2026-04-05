@@ -147,19 +147,16 @@ async function doSearch(params, adToken) {
     if (params.utcOffset !== undefined) qs.set('utcOffset', params.utcOffset);
     if (adToken) qs.set('adToken', adToken);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 40_000);
-
     let res;
     try {
-      res = await fetch(`${API_BASE}/api/search?${qs.toString()}`, { signal: controller.signal });
+      res = await fetch(`${API_BASE}/api/search?${qs.toString()}`, {
+        signal: AbortSignal.timeout(40_000),
+      });
     } catch (fetchErr) {
-      if (fetchErr.name === 'AbortError') {
+      if (fetchErr.name === 'AbortError' || fetchErr.name === 'TimeoutError') {
         throw new Error('Search is taking longer than expected — please try again.');
       }
       throw fetchErr;
-    } finally {
-      clearTimeout(timeoutId);
     }
 
     if (res.status === 402) {

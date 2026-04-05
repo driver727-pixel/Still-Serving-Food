@@ -22,21 +22,21 @@ const FirecrawlApp = require('@mendable/firecrawl-js').default;
 const FIRECRAWL_TIMEOUT_MS = 15_000;
 
 /**
- * Race a promise against a timeout; rejects with an AbortError after `ms` ms.
+ * Race a promise against a timeout; rejects after `ms` ms.
  * @template T
  * @param {Promise<T>} promise
  * @param {number} ms
  * @returns {Promise<T>}
  */
 function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      AbortSignal.timeout(ms).addEventListener('abort', () =>
-        reject(new Error(`Firecrawl scrape timed out after ${ms} ms`)),
-      ),
-    ),
-  ]);
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Firecrawl scrape timed out after ${ms} ms`)),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
