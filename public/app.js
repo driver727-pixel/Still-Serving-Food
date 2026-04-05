@@ -147,7 +147,17 @@ async function doSearch(params, adToken) {
     if (params.utcOffset !== undefined) qs.set('utcOffset', params.utcOffset);
     if (adToken) qs.set('adToken', adToken);
 
-    const res = await fetch(`${API_BASE}/api/search?${qs.toString()}`);
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/search?${qs.toString()}`, {
+        signal: AbortSignal.timeout(40_000),
+      });
+    } catch (fetchErr) {
+      if (fetchErr.name === 'AbortError' || fetchErr.name === 'TimeoutError') {
+        throw new Error('Search is taking longer than expected — please try again.');
+      }
+      throw fetchErr;
+    }
 
     if (res.status === 402) {
       // Ad required — server says the free quota is exhausted for this IP

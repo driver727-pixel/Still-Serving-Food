@@ -10,6 +10,7 @@ const { searchVenues, scrapeVenue } = require('./scraper');
 const { runHybridPipeline } = require('./hybridPipeline');
 const { searchOsmVenues, enrichVenuesWithOsmData, buildVenuesFromOsmData } = require('./osmClient');
 const venueStore = require('./venueStore');
+const { normalise: normaliseLocation } = venueStore;
 const { generateAffiliateLinks } = require('./affiliateLinks');
 const {
   isConfidenceVerified,
@@ -590,9 +591,12 @@ app.get('/api/search', async (req, res) => {
   // Clamp to a valid range (±840 minutes covers all real-world offsets).
   const parsedUtcOffset = Math.max(-840, Math.min(840, parseInt(utcOffset, 10) || 0));
 
-  // Build a stable cache key from all search dimensions
+  // Build a stable cache key from all search dimensions.
+  // Apply location normalisation (strips commas, collapses whitespace) only to
+  // the location segment so that "Winona, Minnesota" and "Winona Minnesota"
+  // resolve to the same entry.  Name and servingUntil use simple case folding.
   const cacheKey = [
-    (location || '').toLowerCase().trim(),
+    normaliseLocation(location || ''),
     (name || '').toLowerCase().trim(),
     (servingUntil || '').toLowerCase().trim(),
   ].join('|');

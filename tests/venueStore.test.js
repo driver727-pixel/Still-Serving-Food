@@ -21,6 +21,18 @@ describe('venueStore', () => {
     expect(get('london')).toEqual(venues);
   });
 
+  test('normalises commas so "Winona, Minnesota" hits the same cache as "Winona Minnesota"', () => {
+    const venues = [{ name: 'The Anchor', serving: true }];
+    set('Winona, Minnesota', venues);
+    expect(get('Winona Minnesota')).toEqual(venues);
+  });
+
+  test('collapses extra internal whitespace in cache keys', () => {
+    const venues = [{ name: 'Café Nord' }];
+    set('Saint  Paul', venues);
+    expect(get('Saint Paul')).toEqual(venues);
+  });
+
   test('returns null after TTL expires', () => {
     jest.useFakeTimers();
     const venues = [{ name: 'Test Bar' }];

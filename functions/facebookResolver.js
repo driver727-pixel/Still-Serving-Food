@@ -18,6 +18,29 @@
 
 const FirecrawlApp = require('@mendable/firecrawl-js').default;
 
+/** Maximum time (ms) to wait for a Firecrawl homepage scrape in Phase 2. */
+const FIRECRAWL_TIMEOUT_MS = 15_000;
+
+/**
+ * Race a promise against a timeout; rejects after `ms` ms.
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @returns {Promise<T>}
+ */
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Firecrawl scrape timed out after ${ms} ms`)),
+      ms,
+    );
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 /**
  * Matches a canonical Facebook business-page URL.
  * Excludes share dialogs, login, help, policy, and marketplace paths.
@@ -63,7 +86,10 @@ async function extractFacebookFromWebsite(websiteUrl, apiKey) {
 
   let result;
   try {
-    result = await client.scrape(websiteUrl, { formats: ['links', 'markdown'] });
+    result = await withTimeout(
+      client.scrape(websiteUrl, { formats: ['links', 'markdown'] }),
+      FIRECRAWL_TIMEOUT_MS,
+    );
   } catch {
     return null;
   }
@@ -137,7 +163,10 @@ async function extractInstagramFromWebsite(websiteUrl, apiKey) {
 
   let result;
   try {
-    result = await client.scrape(websiteUrl, { formats: ['links', 'markdown'] });
+    result = await withTimeout(
+      client.scrape(websiteUrl, { formats: ['links', 'markdown'] }),
+      FIRECRAWL_TIMEOUT_MS,
+    );
   } catch {
     return null;
   }
