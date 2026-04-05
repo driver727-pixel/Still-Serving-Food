@@ -6,6 +6,11 @@ const venueStore = require('../functions/venueStore');
 const scraper = require('../functions/scraper');
 
 jest.mock('../functions/scraper');
+jest.mock('../functions/osmClient', () => ({
+  searchOsmVenues: jest.fn().mockResolvedValue([]),
+  enrichVenuesWithOsmData: jest.fn((venues) => venues),
+  buildVenuesFromOsmData: jest.fn().mockReturnValue([]),
+}));
 
 const SAMPLE_VENUES = [
   {

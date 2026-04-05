@@ -372,9 +372,14 @@ describe('searchVenues', () => {
 
   test('accepts apiKey passed via options (overrides env)', async () => {
     delete process.env.FIRECRAWL_API_KEY;
+    const FirecrawlApp = require('@mendable/firecrawl-js').default;
+    FirecrawlApp.prototype.search = jest.fn().mockRejectedValue(new Error('network error'));
+
     await expect(
       searchVenues('Brooklyn, NY', { apiKey: 'fc-dummy' }),
     ).rejects.toThrow(/Firecrawl search failed/);
+
+    delete FirecrawlApp.prototype.search;
   });
 
   test('accepts name param and builds correct query', async () => {
