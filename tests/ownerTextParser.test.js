@@ -3,8 +3,11 @@
 const { normalizePhone, parseOwnerTextCommand, parseScheduleCommand } = require('../functions/ownerTextParser');
 
 describe('ownerTextParser', () => {
-  test('normalizes a phone number to +E164-ish format', () => {
-    expect(normalizePhone('(555) 123-4567')).toBe('+5551234567');
+  test('normalizes a phone number to E.164 format', () => {
+    // 10-digit US number gets +1 country code (matches Twilio E.164 delivery format)
+    expect(normalizePhone('(555) 123-4567')).toBe('+15551234567');
+    // Number already includes country code digit
+    expect(normalizePhone('+15551234567')).toBe('+15551234567');
     expect(normalizePhone('abc')).toBeNull();
   });
 
