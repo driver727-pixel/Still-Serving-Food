@@ -12,7 +12,7 @@
     <meta name="description" content="Search for bars and restaurants near you that are still serving food right now. See kitchen hours, grill hours, and hot food service times for any city or neighbourhood." />
     <meta name="keywords" content="still serving food, kitchen hours, grill hours, food hours, late night food, restaurants serving food now, bar food hours, kitchen open, food service hours" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#f97316" />
+    <meta name="theme-color" content="#ff4fd8" />
 
     <!-- Canonical -->
     <link rel="canonical" href="https://letsnarf.com/search" />
@@ -63,10 +63,12 @@
         <a href="/contact.html">Contact</a>
         <a href="/privacy.html">Privacy</a>
         <a href="/search.html" class="site-nav-cta" aria-current="page">Search Restaurants →</a>
+        <button type="button" class="sound-toggle" data-sound-toggle aria-pressed="true">Sound: On</button>
       </div>
     </nav>
 
     <header class="hero">
+      <p class="machine-kicker">Insert cravings · get neon kitchen intel</p>
       <h1>🍔 Serving Food? Letsnarf!</h1>
       <p class="tagline">
         Find out which bars &amp; restaurants are <strong>serving food right now</strong> — grill
@@ -98,9 +100,11 @@
       </div>
     </div>
 
-    <main>
+    <main class="machine-shell">
+      <section class="vending-machine vending-machine-search" aria-labelledby="search-machine-heading">
+        <p class="machine-topper" id="search-machine-heading">1980s neon vending machine search</p>
       <!-- Publisher-provided editorial introduction (always visible) -->
-      <section class="editorial-intro">
+      <section class="editorial-intro machine-copy">
         <h2>How to Find Late-Night Food Near You</h2>
         <p>
           Whether you're finishing a late shift, wrapping up a night out, or just hit with a midnight craving,
@@ -115,7 +119,7 @@
         </p>
       </section>
 
-      <section class="search-section">
+      <section class="search-section machine-console">
         <form id="search-form" autocomplete="off" novalidate>
           <div class="search-fields">
             <div class="search-field">
@@ -147,22 +151,22 @@
             </div>
           </div>
           <div class="search-actions">
-            <button type="submit" id="search-btn">Search</button>
+            <button type="submit" id="search-btn" data-sound="action">Find What's Serving Near You</button>
           </div>
           <p class="search-hint">First search is free. Additional searches require watching a brief ad. Or <a href="#" style="color:var(--accent)">subscribe for unlimited searches ($4.99)</a>. Restaurant owner? <a href="/owner-sms.html">Set up text updates</a>.</p>
         </form>
       </section>
 
-      <section id="results-section" class="results-section hidden">
+      <section id="results-section" class="results-section dispenser-results hidden">
         <div class="results-header">
           <h2 id="results-title">Results</h2>
           <span id="results-meta" class="results-meta"></span>
         </div>
 
         <div class="filter-bar">
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="serving">🟢 Serving Now</button>
-          <button class="filter-btn" data-filter="not-serving">🔴 Not Serving</button>
+          <button class="filter-btn active" data-filter="all" data-sound="toggle">All</button>
+          <button class="filter-btn" data-filter="serving" data-sound="toggle">🟢 Serving Now</button>
+          <button class="filter-btn" data-filter="not-serving" data-sound="toggle">🔴 Not Serving</button>
         </div>
         <div class="results-refine">
           <label for="refine-name" class="refine-label">Filter by name:</label>
@@ -192,7 +196,7 @@
                data-full-width-responsive="true"></ins>
         </div>
 
-        <div id="venue-list" class="venue-list"></div>
+        <div id="venue-list" class="venue-list dispenser-output"></div>
 
         <!-- Contextual tips shown alongside results to add editorial value -->
         <aside class="results-tips" aria-label="Late-night dining tips">
@@ -219,11 +223,12 @@
 
       <section id="loading" class="loading hidden">
         <div class="spinner"></div>
-        <p>Crawling food hours…</p>
+        <p>Dispensing fresh kitchen hours…</p>
       </section>
 
       <section id="error-section" class="error-section hidden">
         <p id="error-message"></p>
+      </section>
       </section>
     </main>
 
@@ -317,6 +322,7 @@
       </p>
     </footer>
 
+    <script src="neon-sounds.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
