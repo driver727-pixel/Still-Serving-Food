@@ -4,7 +4,10 @@
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return;
 
+  const SOUND_PREF_KEY = 'ssf_sound_enabled';
+  const soundToggleButtons = document.querySelectorAll('[data-sound-toggle]');
   let audioContext;
+  let soundEnabled = localStorage.getItem(SOUND_PREF_KEY) !== '0';
 
   function getAudioContext() {
     if (!audioContext) audioContext = new AudioCtx();
@@ -13,9 +16,11 @@
 
   function unlockAudio() {
     const ctx = getAudioContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+    if (ctx.state !== 'suspended') {
+      removeUnlockListeners();
+      return;
     }
+    ctx.resume().then(removeUnlockListeners).catch(() => {});
   }
 
   function playTone({
@@ -34,11 +39,11 @@
 
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, startAt);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(endFrequency, 1), endAt);
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(endFrequency, 20), endAt);
 
-    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.setValueAtTime(0.001, startAt);
     gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+    gain.gain.linearRampToValueAtTime(0.001, endAt);
 
     oscillator.connect(gain);
     gain.connect(ctx.destination);
@@ -47,6 +52,7 @@
   }
 
   function playSound(kind) {
+    if (!soundEnabled) return;
     unlockAudio();
 
     if (kind === 'soda') {
@@ -69,16 +75,36 @@
     playTone({ frequency: 610, endFrequency: 490, duration: 0.06, volume: 0.015, type: 'triangle', delay: 0.03 });
   }
 
-  document.addEventListener(
-    'click',
-    (event) => {
-      const trigger = event.target.closest('[data-sound]');
-      if (!trigger) return;
-      playSound(trigger.dataset.sound || 'action');
-    },
-    true,
-  );
+  function updateSoundToggleUi() {
+    soundToggleButtons.forEach((button) => {
+      button.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+      button.textContent = soundEnabled ? 'Sound: On' : 'Sound: Off';
+    });
+  }
+
+  updateSoundToggleUi();
+
+  soundToggleButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const wasEnabled = soundEnabled;
+      soundEnabled = !soundEnabled;
+      localStorage.setItem(SOUND_PREF_KEY, soundEnabled ? '1' : '0');
+      updateSoundToggleUi();
+      if (!wasEnabled && soundEnabled) playSound('toggle');
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-sound]');
+    if (!trigger) return;
+    playSound(trigger.dataset.sound || 'action');
+  });
+
+  function removeUnlockListeners() {
+    window.removeEventListener('pointerdown', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+  }
 
   window.addEventListener('pointerdown', unlockAudio, { passive: true });
-  window.addEventListener('keydown', unlockAudio, { passive: true });
+  window.addEventListener('keydown', unlockAudio);
 })();

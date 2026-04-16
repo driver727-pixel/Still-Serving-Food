@@ -1681,13 +1681,18 @@ footer a {
 .machine-topper,
 .machine-kicker,
 .site-nav-brand,
-.home-hero h1,
-.hero h1,
 .search-cta-btn,
 #search-btn {
   text-shadow:
-    0 0 12px rgba(255, 79, 216, 0.55),
-    0 0 24px rgba(61, 246, 255, 0.3);
+    0 0 8px rgba(255, 79, 216, 0.38),
+    0 0 16px rgba(61, 246, 255, 0.18);
+}
+
+.home-hero h1,
+.hero h1 {
+  text-shadow:
+    0 0 10px rgba(255, 79, 216, 0.26),
+    0 0 20px rgba(61, 246, 255, 0.12);
 }
 
 .machine-topper {
@@ -1705,6 +1710,7 @@ footer a {
   text-align: center;
   text-transform: uppercase;
   animation: neonFlicker 5s infinite;
+  will-change: opacity, filter;
 }
 
 .machine-kicker {
@@ -1737,6 +1743,23 @@ footer a {
   color: #efe7ff;
 }
 
+.sound-toggle {
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(61, 246, 255, 0.22);
+  background: rgba(61, 246, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sound-toggle[aria-pressed='false'] {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+}
+
 .site-nav-links a:hover {
   color: var(--text);
   background: rgba(61, 246, 255, 0.12);
@@ -1749,7 +1772,7 @@ footer a {
 .ad-continue-btn,
 .owner-sms-btn {
   background: linear-gradient(135deg, var(--accent), #8b5cf6);
-  color: #fff !important;
+  color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 0 18px rgba(255, 79, 216, 0.34);
 }
@@ -1947,6 +1970,7 @@ footer a {
   background: linear-gradient(90deg, rgba(61, 246, 255, 0.12), rgba(255, 79, 216, 0.28), rgba(61, 246, 255, 0.12));
   box-shadow: 0 0 18px rgba(255, 79, 216, 0.22);
   animation: neonFlicker 4.5s infinite;
+  will-change: opacity, filter;
 }
 
 .dispenser-results {
@@ -2110,8 +2134,9 @@ footer {
   *,
   *::before,
   *::after {
-    animation: none !important;
-    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }
