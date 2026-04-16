@@ -47,6 +47,71 @@
     }
     </script>
 
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What does Still Serving Food do?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Still Serving Food helps you find restaurants and bars that are still taking food orders right now. It focuses on kitchen, grill, and hot-food service times rather than general opening hours."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I search for food-serving restaurants near me?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Enter a city or neighbourhood in the search box and review the results for venues that are serving now, closing soon, or opening later. The search is designed to answer the practical question of where you can still order food."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Where do the kitchen hours come from?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Still Serving Food compares information from venue websites, social profiles, and structured business sources to assemble the best available picture of a venue's food-service schedule."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How accurate and up to date are the results?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Results are refreshed when a search runs and cached for 10 minutes. Confidence information can help you judge reliability, but it is still smart to call the venue directly around holidays, events, or unexpected schedule changes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why can a restaurant be open but not serving food?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Many venues stay open for drinks or seating after the kitchen has stopped taking orders. Still Serving Food tracks the food ordering window, which can end earlier than the venue's normal business hours."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can restaurant owners update their listing?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Verified business owners can claim their venue and publish authoritative hours or temporary closure updates, helping customers see more reliable food-service information."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I have to pay to use Still Serving Food?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The first search each session is free. Additional searches are supported by a short wait, or you can subscribe for unlimited access."
+          }
+        }
+      ]
+    }
+    </script>
+
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -263,23 +328,38 @@
       <h2 id="faq-heading">Frequently Asked Questions</h2>
 
       <details class="faq-item">
-        <summary>What is Still Serving Food?</summary>
-        <p>Still Serving Food is a free web app that crawls local restaurant and bar websites in real time to find their kitchen hours, grill hours, and hot food service times — so you know exactly which places near you are still serving food right now.</p>
+        <summary>What does Still Serving Food do?</summary>
+        <p>Still Serving Food helps you find restaurants and bars that are <strong>still taking food orders right now</strong>. It focuses on kitchen, grill, and hot-food service times rather than broad business hours that do not tell you whether you can still eat.</p>
       </details>
 
       <details class="faq-item">
-        <summary>How do I find out which restaurants are still serving food near me?</summary>
-        <p>Enter your city or neighbourhood (e.g. "Brooklyn, NY" or "Manchester, UK") in the search box and click Search. Still Serving Food instantly shows you which nearby bars and restaurants are currently serving food, along with their kitchen closing times.</p>
+        <summary>How do I search for food-serving restaurants near me?</summary>
+        <p>Enter your city or neighbourhood in the search box and click Search. You will get results for venues that are serving now, closing soon, or opening later, so you can make a fast decision without digging through multiple restaurant sites.</p>
       </details>
 
       <details class="faq-item">
-        <summary>Does Still Serving Food show kitchen closing times?</summary>
-        <p>Yes. Still Serving Food shows the exact time the kitchen closes at each venue, so you can see how much time you have to order food. It focuses on food service hours — not general opening hours or bar hours.</p>
+        <summary>Where do the kitchen hours come from?</summary>
+        <p>We compare information from venue websites, social profiles, and structured business sources to assemble the best available picture of a venue's food-service schedule. That extra comparison helps when kitchen hours are harder to find than normal opening hours.</p>
       </details>
 
       <details class="faq-item">
-        <summary>How accurate is the food hours information?</summary>
-        <p>Food hours are scraped in real time from each venue's own website. While we strive for accuracy, hours can change and may not reflect special closures or seasonal changes. Results are cached for 10 minutes. Always confirm with the venue directly for the most reliable information.</p>
+        <summary>How accurate and up to date are the results?</summary>
+        <p>Results are refreshed when a search runs and cached for 10 minutes to keep response times fast. We also surface confidence information when available, but it is still smart to call the venue directly around holidays, events, or unexpected schedule changes.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Why can a restaurant be open but not serving food?</summary>
+        <p>Many venues stay open for drinks or seating after the kitchen has stopped taking orders. We track the food ordering window, so a place can appear open overall while no longer serving meals.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Can restaurant owners update their listing?</summary>
+        <p>Yes. Verified business owners can claim their venue and publish authoritative hours or temporary closure updates, helping customers see more reliable food-service information.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Do I have to pay to use Still Serving Food?</summary>
+        <p>The first search each session is free. Additional searches are supported by a short wait, or you can subscribe for unlimited access if you use the tool often.</p>
       </details>
     </section>
 
