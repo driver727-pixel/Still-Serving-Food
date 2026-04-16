@@ -500,7 +500,7 @@ app._ownerTextScheduleStore = ownerTextScheduleStore;
 app._ownerTextAuditStore = ownerTextAuditStore;
 app._ownerTextIngressRateLimit = ownerTextIngressRateLimit;
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
 
 /**
  * Return true only when url uses http/https and does not target a

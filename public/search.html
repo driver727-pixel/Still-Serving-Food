@@ -245,18 +245,17 @@
           actually rendered. Ads never show on empty/zero-result states,
           loading screens, error screens, or behavioral modals.
 
-          TODO after AdSense approval:
-            1. Go to AdSense → By ad unit → Display ads → create a new unit.
-            2. Copy the numeric data-ad-slot value (e.g. "1234567890").
-            3. Replace BOTH occurrences of "YOUR_AD_SLOT_ID" below with that value
-               (or use separate slot IDs for each placement if you prefer).
+          TO ACTIVATE: Go to AdSense → By ad unit → Display ads → create a new unit,
+          then copy the numeric data-ad-slot value (e.g. "1234567890") into the
+          data-ad-slot attributes below. Use separate slot IDs for each placement
+          if you prefer distinct ad unit reporting.
         -->
         <div id="results-ads-top" class="search-ad hidden" aria-label="Advertisement">
           <p class="search-ad-label">Advertisement</p>
           <ins class="adsbygoogle"
                style="display:block"
                data-ad-client="ca-pub-6419733083900935"
-               data-ad-slot="YOUR_AD_SLOT_ID"
+               data-ad-slot=""
                data-ad-format="auto"
                data-full-width-responsive="true"></ins>
         </div>
@@ -280,7 +279,7 @@
           <ins class="adsbygoogle"
                style="display:block"
                data-ad-client="ca-pub-6419733083900935"
-               data-ad-slot="YOUR_AD_SLOT_ID"
+               data-ad-slot=""
                data-ad-format="auto"
                data-full-width-responsive="true"></ins>
         </div>
