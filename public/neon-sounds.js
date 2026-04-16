@@ -5,6 +5,9 @@
   if (!AudioCtx) return;
 
   const SOUND_PREF_KEY = 'ssf_sound_enabled';
+  const MIN_RAMP_FREQUENCY = 20;
+  const ENVELOPE_FLOOR = 0.001;
+  const ENVELOPE_ATTACK = 0.01;
   const soundToggleButtons = document.querySelectorAll('[data-sound-toggle]');
   let audioContext;
   let soundEnabled = localStorage.getItem(SOUND_PREF_KEY) !== '0';
@@ -39,11 +42,11 @@
 
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, startAt);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(endFrequency, 20), endAt);
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(endFrequency, MIN_RAMP_FREQUENCY), endAt);
 
-    gain.gain.setValueAtTime(0.001, startAt);
-    gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.01);
-    gain.gain.linearRampToValueAtTime(0.001, endAt);
+    gain.gain.setValueAtTime(ENVELOPE_FLOOR, startAt);
+    gain.gain.exponentialRampToValueAtTime(volume, startAt + ENVELOPE_ATTACK);
+    gain.gain.linearRampToValueAtTime(ENVELOPE_FLOOR, endAt);
 
     oscillator.connect(gain);
     gain.connect(ctx.destination);
