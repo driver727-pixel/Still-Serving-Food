@@ -20,6 +20,14 @@ jest.mock('../functions/scraper');
 const scraper = require('../functions/scraper');
 const { buildVenue } = jest.requireActual('../functions/scraper');
 
+// Mock osmClient so the legacy search pipeline never makes real Overpass API
+// calls during tests (which would return real venues and break count assertions).
+jest.mock('../functions/osmClient', () => ({
+  searchOsmVenues: jest.fn().mockResolvedValue([]),
+  enrichVenuesWithOsmData: jest.fn((firecrawlVenues) => firecrawlVenues),
+  buildVenuesFromOsmData: jest.fn().mockReturnValue([]),
+}));
+
 const { parseHours, isCurrentlyServing, formatTime } = require('../functions/hoursParser');
 
 // ---------------------------------------------------------------------------

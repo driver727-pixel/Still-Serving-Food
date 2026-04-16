@@ -44,7 +44,7 @@ function clear() {
 }
 
 function normalise(location) {
-  return location.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
+  return location.toLowerCase().replace(/,\s*/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 module.exports = { get, set, clear, normalise };
