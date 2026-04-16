@@ -20,6 +20,8 @@
   --accent-2: #3df6ff;
   --radius: 18px;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --flicker-duration: 5s;
+  --flicker-duration-fast: 4.5s;
 }
 
 body {
@@ -1709,7 +1711,7 @@ footer a {
   letter-spacing: 0.18em;
   text-align: center;
   text-transform: uppercase;
-  animation: neonFlicker 5s infinite;
+  animation: neonFlicker var(--flicker-duration) infinite;
   will-change: opacity, filter;
 }
 
@@ -1969,7 +1971,7 @@ footer a {
   border-radius: 12px;
   background: linear-gradient(90deg, rgba(61, 246, 255, 0.12), rgba(255, 79, 216, 0.28), rgba(61, 246, 255, 0.12));
   box-shadow: 0 0 18px rgba(255, 79, 216, 0.22);
-  animation: neonFlicker 4.5s infinite;
+  animation: neonFlicker var(--flicker-duration-fast) infinite;
   will-change: opacity, filter;
 }
 

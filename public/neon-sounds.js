@@ -37,11 +37,12 @@
     const ctx = getAudioContext();
     const startAt = ctx.currentTime + delay;
     const endAt = startAt + duration;
+    const startFrequency = Math.max(frequency, MIN_RAMP_FREQUENCY);
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
 
     oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, startAt);
+    oscillator.frequency.setValueAtTime(startFrequency, startAt);
     oscillator.frequency.exponentialRampToValueAtTime(Math.max(endFrequency, MIN_RAMP_FREQUENCY), endAt);
 
     gain.gain.setValueAtTime(ENVELOPE_FLOOR, startAt);
