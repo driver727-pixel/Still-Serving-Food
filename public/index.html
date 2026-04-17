@@ -12,7 +12,7 @@
     <meta name="description" content="Covering Madison's local food scene, sustainable dining, and the tools that help you find restaurants still serving food near you. Rooted in Wisconsin's co-op culture and community food systems." />
     <meta name="keywords" content="Madison food, sustainable dining Madison, Willy Street Co-op, Madison Food Loop, local food Wisconsin, still serving food, kitchen hours, restaurants open now" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#f97316" />
+    <meta name="theme-color" content="#ff4fd8" />
 
     <!-- Canonical -->
     <link rel="canonical" href="https://letsnarf.com/" />
@@ -53,34 +53,58 @@
       "mainEntity": [
         {
           "@type": "Question",
-          "name": "What is Still Serving Food?",
+          "name": "What does Still Serving Food do?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Still Serving Food is a content site covering Madison's local food scene, sustainability, and co-op culture — plus a free web tool that crawls restaurant websites in real time to show kitchen hours and which venues are currently serving food."
+            "text": "Still Serving Food is a free search tool and editorial site built around one practical question: who is still serving food right now? We focus on food-service hours such as kitchen, grill, and hot-food service times rather than general business hours."
           }
         },
         {
           "@type": "Question",
-          "name": "How do I search for restaurants still serving food near me?",
+          "name": "How do I find places that are still serving food near me?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Visit the Search page, enter your city or neighbourhood, and the tool will show you which nearby bars and restaurants are currently serving food along with their kitchen closing times."
+            "text": "Go to the dedicated Search page, enter a city or neighbourhood, and review the results for venues that are serving now, closing soon, or opening later. The goal is to help you decide quickly where you can still place a food order."
           }
         },
         {
           "@type": "Question",
-          "name": "What is the Madison Food Loop?",
+          "name": "Where do the kitchen hours come from?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "The Madison Food Loop is a community initiative in Madison, Wisconsin dedicated to reducing food waste and connecting local food producers, restaurants, and consumers to build a more sustainable regional food system."
+            "text": "Still Serving Food checks a mix of venue websites, social profiles, and structured business data to build the best available estimate of a kitchen's food-service schedule. That gives you a more useful answer than standard listings that only show when the building is open."
           }
         },
         {
           "@type": "Question",
-          "name": "How accurate is the kitchen hours information?",
+          "name": "How accurate and up to date are the results?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Kitchen hours are scraped in real time from each venue's own website. Results are cached for 10 minutes. Always confirm directly with the venue for the most reliable information, especially around holidays or special events."
+            "text": "Results are refreshed when a search runs and cached for 10 minutes to keep the experience fast. We surface confidence information when available, but hours can still change unexpectedly, so it is always wise to call the venue around holidays, events, or last-minute schedule changes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why can a restaurant be open but not serving food?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Many bars and restaurants keep the bar, patio, or dining room open after the kitchen stops taking orders. We track the food ordering window, so a venue can be open for drinks or seating while no longer serving food."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can restaurant owners update their listing?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Verified business owners can claim their venue and publish authoritative hours or temporary closure updates, which helps customers see the most reliable food-service information available."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I have to pay to use Still Serving Food?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The search tool is free to try. The first search each session is free, and additional searches are supported by a short wait or an optional subscription for unlimited access."
           }
         }
       ]
@@ -103,46 +127,78 @@
         <a href="/contact.html">Contact</a>
         <a href="/privacy.html">Privacy</a>
         <a href="/search.html" class="site-nav-cta">Search Restaurants →</a>
+        <button type="button" class="sound-toggle" data-sound-toggle aria-pressed="true">Sound: On</button>
       </div>
     </nav>
 
-    <!-- ── Hero ── -->
-    <header class="home-hero">
-      <h1>🍔 Letsnarf — Madison Food &amp; Late-Night Kitchen Hours</h1>
-      <p>
-        Your guide to Madison's local food scene, sustainable restaurants, co-op culture, and the
-        free tool that shows you which places are <strong style="color:var(--green)">still serving food right now</strong>.
-      </p>
-      <a href="/search.html" class="home-hero-cta">Find What's Serving Near You →</a>
-    </header>
+    <main class="machine-shell">
+      <section class="vending-machine vending-machine-home" aria-labelledby="machine-home-heading">
+        <p class="machine-topper"></p>
 
-    <!-- ── Top AdSense Banner ── -->
-    <div class="homepage-ad" aria-label="Advertisement">
-      <p class="homepage-ad-label">Advertisement</p>
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client="ca-pub-6419733083900935"
-           data-ad-slot="YOUR_AD_SLOT_ID"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-    </div>
+        <!-- ── Hero ── -->
+        <header class="home-hero">
+          <p class="machine-kicker">Still Serving Food</p>
+          <h1 id="machine-home-heading">Kitchen-Hours Machine</h1>
+          <p>
+            Your guide to Madison's local food scene, sustainable restaurants, co-op culture, and the
+            free tool that shows you which places are <strong style="color:var(--green)">still serving food right now</strong>.
+          </p>
+        </header>
 
-    <!-- ── Blog Feed ── -->
-    <section class="blog-feed" aria-labelledby="articles-heading">
-      <h2 class="blog-feed-heading" id="articles-heading">Latest Articles</h2>
-      <div class="blog-grid">
+        <!-- ── Top AdSense Banner ── -->
+        <div class="homepage-ad" aria-label="Advertisement">
+          <p class="homepage-ad-label">Advertisement</p>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-6419733083900935"
+               data-ad-slot=""
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
 
-        <a href="/articles/my-first-video-game.html" class="blog-card">
-          <div class="blog-card-emoji">🎮</div>
-          <div class="blog-card-title">The Journey of Punch Skater and My Digital Ventures</div>
-          <div class="blog-card-excerpt">From an obsession with electric skateboards to launching a trading card game, a photography LLC, and language creation apps — the story of Punch Skater and SP Digital LLC.</div>
+        <!-- ── Blog Feed ── -->
+        <section class="blog-feed" aria-labelledby="articles-heading">
+          <div class="panel-header">
+            <h2 class="blog-feed-heading" id="articles-heading">Choose a Soda Button Story</h2>
+            <p class="panel-copy">Each article lights up like a vending machine selector, with large labels that stay readable on phones, tablets, and desktops.</p>
+          </div>
+          <div class="blog-grid">
+
+        <a href="/articles/see-price.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">A1</div>
+          <div class="blog-card-emoji">💰</div>
+          <div class="blog-card-title">SeePrice: My Very First Web App</div>
+          <div class="blog-card-excerpt">How building a simple price tracking tool on Replit became the spark that launched a dozen apps, a trademark, and the most productive year of my life.</div>
           <div class="blog-card-meta">
-            <span class="blog-card-tag">Tech &amp; Gaming</span>
-            <span>8 min read</span>
+            <span class="blog-card-tag">Tech &amp; Apps</span>
+            <span>5 min read</span>
           </div>
         </a>
 
-        <a href="/articles/this-invention-madfoodloop.html" class="blog-card">
+        <a href="/articles/my-first-video-game.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">A2</div>
+          <div class="blog-card-emoji">🎮</div>
+          <div class="blog-card-title">My First Video Game: The Journey of Punch Skater and My Digital Ventures</div>
+          <div class="blog-card-excerpt">From an obsession with electric skateboards to an AI-powered trading card game — how Punch Skater became my first official video game and launched a connected universe of apps.</div>
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Tech &amp; Apps</span>
+            <span>5 min read</span>
+          </div>
+        </a>
+
+        <a href="/articles/my-craftlingua-app.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">A3</div>
+          <div class="blog-card-emoji">🗣️</div>
+          <div class="blog-card-title">MyCraftlingua.app: Building a Language Creation Platform</div>
+          <div class="blog-card-excerpt">An original idea from childhood turned into a fully functioning language creation platform — complete with a Scriptorium, Auditorium, social Agora, and cipher tools for conlangers everywhere.</div>
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Tech &amp; Apps</span>
+            <span>5 min read</span>
+          </div>
+        </a>
+
+        <a href="/articles/this-invention-madfoodloop.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">A4</div>
           <div class="blog-card-emoji">💡</div>
           <div class="blog-card-title">This Invention: How 20 Years in Madison's Food Industry Led to MadFoodLoop</div>
           <div class="blog-card-excerpt">After delivering pizzas for 15 years, managing a food bank warehouse, and running the Willy Street Co-op Deli, one food worker saw the same gap every time — and built the app to close it.</div>
@@ -152,7 +208,8 @@
           </div>
         </a>
 
-        <a href="/articles/willy-street-coop-local-food.html" class="blog-card">
+        <a href="/articles/willy-street-coop-local-food.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">B1</div>
           <div class="blog-card-emoji">🌿</div>
           <div class="blog-card-title">Willy Street Co-op: How Madison's Beloved Co-op Supports Local Farmers</div>
           <div class="blog-card-excerpt">For over 50 years, Willy Street Co-op has been the heartbeat of Madison's local food economy — connecting small farms, ethical producers, and community members around real food.</div>
@@ -162,7 +219,8 @@
           </div>
         </a>
 
-        <a href="/articles/madison-food-loop-sustainability.html" class="blog-card">
+        <a href="/articles/madison-food-loop-sustainability.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">B2</div>
           <div class="blog-card-emoji">♻️</div>
           <div class="blog-card-title">The Madison Food Loop: Closing the Loop on Food Waste in Wisconsin</div>
           <div class="blog-card-excerpt">Food waste is one of the largest contributors to climate change. The Madison Food Loop is a community-led initiative turning that problem into opportunity — and you can participate.</div>
@@ -172,7 +230,8 @@
           </div>
         </a>
 
-        <a href="/articles/sustainable-dining-madison.html" class="blog-card">
+        <a href="/articles/sustainable-dining-madison.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">B3</div>
           <div class="blog-card-emoji">🥗</div>
           <div class="blog-card-title">Sustainable Dining in Madison: Restaurants Putting the Planet First</div>
           <div class="blog-card-excerpt">From compostable packaging to zero-waste kitchens, a growing wave of Madison restaurants is proving that great food and environmental responsibility go hand in hand.</div>
@@ -182,7 +241,8 @@
           </div>
         </a>
 
-        <a href="/articles/farm-to-table-madison.html" class="blog-card">
+        <a href="/articles/farm-to-table-madison.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">B4</div>
           <div class="blog-card-emoji">🌽</div>
           <div class="blog-card-title">Farm-to-Table in Madison: Why Wisconsin's Capital Leads the Way</div>
           <div class="blog-card-excerpt">Madison's Dane County Farmers' Market is one of the largest producer-only markets in the country. Discover how the farm-to-table movement took root here and where to taste it today.</div>
@@ -192,7 +252,8 @@
           </div>
         </a>
 
-        <a href="/articles/reduce-food-waste-madison.html" class="blog-card">
+        <a href="/articles/reduce-food-waste-madison.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">C1</div>
           <div class="blog-card-emoji">🍱</div>
           <div class="blog-card-title">5 Ways Madison Residents Can Reduce Food Waste Right Now</div>
           <div class="blog-card-excerpt">Small changes in how we shop, cook, and eat out can dramatically cut food waste. Here are five practical steps rooted in Madison's own food system infrastructure.</div>
@@ -202,7 +263,8 @@
           </div>
         </a>
 
-        <a href="/articles/food-rescue-madison.html" class="blog-card">
+        <a href="/articles/food-rescue-madison.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">C2</div>
           <div class="blog-card-emoji">🤝</div>
           <div class="blog-card-title">Closing the Loop on Madison's Food Waste</div>
           <div class="blog-card-excerpt">One in eight Wisconsin residents faces food insecurity while good food disappears into dumpsters every day. Discover how MadFoodLoop is building the bridge between surplus and need.</div>
@@ -212,7 +274,8 @@
           </div>
         </a>
 
-        <a href="/articles/behind-deli-counter-coop.html" class="blog-card">
+        <a href="/articles/behind-deli-counter-coop.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">C3</div>
           <div class="blog-card-emoji">🧀</div>
           <div class="blog-card-title">Behind the Deli Counter: What Makes a Co-op Different?</div>
           <div class="blog-card-excerpt">Five years as an Assistant Deli Manager at a food co-op taught me that the ownership structure shapes everything — down to details most shoppers never notice.</div>
@@ -222,7 +285,8 @@
           </div>
         </a>
 
-        <a href="/articles/hidden-gem-patios-madison.html" class="blog-card">
+        <a href="/articles/hidden-gem-patios-madison.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">C4</div>
           <div class="blog-card-emoji">🌞</div>
           <div class="blog-card-title">Madison's Best Hidden Gem Restaurant Patios</div>
           <div class="blog-card-excerpt">The best outdoor dining spots in Madison aren't always obvious. From Michael's Frozen Custard to Eno Vino's rooftop, here are the patios worth seeking out.</div>
@@ -232,7 +296,8 @@
           </div>
         </a>
 
-        <a href="/articles/tech-food-sustainability.html" class="blog-card">
+        <a href="/articles/tech-food-sustainability.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">D1</div>
           <div class="blog-card-emoji">💻</div>
           <div class="blog-card-title">The Future of Tech in Food Sustainability</div>
           <div class="blog-card-excerpt">Auto-matching algorithms, automated compliance documentation, and real-time data pipelines are changing how surplus food reaches people who need it. Here's how.</div>
@@ -242,7 +307,8 @@
           </div>
         </a>
 
-        <a href="/articles/food-photography-budget.html" class="blog-card">
+        <a href="/articles/food-photography-budget.html" class="blog-card soda-button" data-sound="soda">
+          <div class="blog-card-code">D2</div>
           <div class="blog-card-emoji">📸</div>
           <div class="blog-card-title">How to Photograph Food Like a Pro (On a Budget)</div>
           <div class="blog-card-excerpt">Great food photography is about understanding light and angle — not expensive gear. These practical techniques work on any smartphone or camera.</div>
@@ -252,60 +318,84 @@
           </div>
         </a>
 
-      </div>
-    </section>
+          </div>
+        </section>
 
-    <!-- ── Mid-page AdSense ── -->
-    <div class="homepage-ad" aria-label="Advertisement">
-      <p class="homepage-ad-label">Advertisement</p>
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client="ca-pub-6419733083900935"
-           data-ad-slot="YOUR_AD_SLOT_ID"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-    </div>
+        <!-- ── Mid-page AdSense ── -->
+        <div class="homepage-ad" aria-label="Advertisement">
+          <p class="homepage-ad-label">Advertisement</p>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-6419733083900935"
+               data-ad-slot=""
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
 
-    <!-- ── Search CTA Strip ── -->
-    <section class="search-cta-strip" aria-labelledby="search-cta-heading">
-      <h2 id="search-cta-heading">🔍 Is Your Favourite Restaurant Still Serving?</h2>
-      <p>Use our free real-time search to check kitchen hours, grill hours, and hot food service times at bars and restaurants near you — right now.</p>
-      <a href="/search.html" class="search-cta-btn">Search for Food Near You →</a>
-    </section>
+        <!-- ── Search CTA Strip ── -->
+        <section class="search-cta-strip dispenser-panel" aria-labelledby="search-cta-heading">
+          <div class="dispenser-display">
+            <p class="machine-kicker">Dispense fresh results</p>
+            <h2 id="search-cta-heading">🔍 Find what's serving near you</h2>
+            <p>Use our free real-time search to check kitchen hours, grill hours, and hot food service times at bars and restaurants near you — right now.</p>
+          </div>
+          <a href="/search.html" class="search-cta-btn" data-sound="action">Find What's Serving Near You →</a>
+          <div class="dispenser-slot" aria-hidden="true">
+            <span class="dispenser-slot-glow"></span>
+          </div>
+        </section>
+      </section>
+    </main>
 
     <!-- ── FAQ ── -->
     <section class="faq-section" aria-labelledby="faq-heading">
       <h2 id="faq-heading">Frequently Asked Questions</h2>
 
       <details class="faq-item">
-        <summary>What is Still Serving Food?</summary>
-        <p>Still Serving Food is a content site covering Madison's local food scene, sustainability, and co-op culture — plus a free web tool that crawls restaurant and bar websites in real time to show kitchen hours and which venues are currently serving food.</p>
+        <summary>What does Still Serving Food do?</summary>
+        <p>Still Serving Food is a free search tool and editorial site built around one practical question: <strong>who is still serving food right now?</strong> We focus on food-service hours such as kitchen, grill, and hot-food service times rather than general business hours.</p>
       </details>
 
       <details class="faq-item">
-        <summary>How do I find restaurants still serving food near me?</summary>
-        <p>Visit the <a href="/search.html">Search page</a>, enter your city or neighbourhood (e.g. "Madison, WI" or "Brooklyn, NY"), and the tool will show you which nearby venues are currently serving food, along with their kitchen closing times.</p>
+        <summary>How do I find places that are still serving food near me?</summary>
+        <p>Go to the <a href="/search.html">Search page</a>, enter your city or neighbourhood, and review the results for venues that are serving now, closing soon, or opening later. The goal is to help you decide quickly where you can still place a food order.</p>
       </details>
 
       <details class="faq-item">
-        <summary>What is the Madison Food Loop?</summary>
-        <p>The Madison Food Loop is a community initiative in Madison, Wisconsin dedicated to reducing food waste and building a more connected, resilient local food system. Read our <a href="/articles/madison-food-loop-sustainability.html">full article on the Madison Food Loop</a> to learn more.</p>
+        <summary>Where do the kitchen hours come from?</summary>
+        <p>Still Serving Food checks a mix of venue websites, social profiles, and structured business data to build the best available estimate of a kitchen's food-service schedule. That gives you a more useful answer than standard listings that only show when the building is open.</p>
       </details>
 
       <details class="faq-item">
-        <summary>How accurate is the kitchen hours information?</summary>
-        <p>Kitchen hours are scraped in real time from each venue's own website and cached for 10 minutes. While we strive for accuracy, hours can change. Always confirm directly with the venue for the most reliable information, especially around holidays or special events.</p>
+        <summary>How accurate and up to date are the results?</summary>
+        <p>Results are refreshed when a search runs and cached for 10 minutes to keep the experience fast. We surface confidence information when available, but hours can still change unexpectedly, so it is always wise to call the venue around holidays, events, or last-minute schedule changes.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Why can a restaurant be open but not serving food?</summary>
+        <p>Many bars and restaurants keep the bar, patio, or dining room open after the kitchen stops taking orders. We track the <em>food ordering window</em>, so a venue can be open for drinks or seating while no longer serving food.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Can restaurant owners update their listing?</summary>
+        <p>Yes. Verified business owners can claim their venue and publish authoritative hours or temporary closure updates, which helps customers see the most reliable food-service information available.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Do I have to pay to use Still Serving Food?</summary>
+        <p>The search tool is free to try. Your first search each session is free, and additional searches are supported by a short wait or an optional subscription for unlimited access.</p>
       </details>
     </section>
 
     <footer>
       <p>
-        &copy; 2024 Still Serving Food &mdash;
+        &copy; 2026 SP Digital LLC &mdash;
         <a href="/about.html">About</a> &middot;
         <a href="/contact.html">Contact</a> &middot;
         <a href="/privacy.html">Privacy Policy</a> &middot;
         Powered by <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer">Firecrawl</a>
       </p>
     </footer>
+    <script src="neon-sounds.js"></script>
   </body>
 </html>

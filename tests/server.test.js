@@ -573,17 +573,17 @@ describe('Owner text updates', () => {
       .send({ phone: '(555) 123-4567' });
 
     expect(registerRes.status).toBe(200);
-    expect(registerRes.body.phone).toBe('+5551234567');
+    expect(registerRes.body.phone).toBe('+15551234567');
     expect(registerRes.body.verification_code).toMatch(/^\d{6}$/);
 
     const verifyRes = await request(app)
       .post('/api/business/text-number/verify')
       .set('Authorization', `Bearer ${token}`)
-      .send({ phone: '+5551234567', code: registerRes.body.verification_code });
+      .send({ phone: '+15551234567', code: registerRes.body.verification_code });
 
     expect(verifyRes.status).toBe(200);
-    expect(app._verifiedOwnerPhoneStore.get('+5551234567')).toMatchObject({ venueKey });
-    expect(app._businessClaimStore.get(venueKey).verifiedPhone).toBe('+5551234567');
+    expect(app._verifiedOwnerPhoneStore.get('+15551234567')).toMatchObject({ venueKey });
+    expect(app._businessClaimStore.get(venueKey).verifiedPhone).toBe('+15551234567');
   });
 
   test('rejects inbound text from an unknown number', async () => {

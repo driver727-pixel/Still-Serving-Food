@@ -5,6 +5,8 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: FIRECRAWL_API_KEY
         sync: false
       - key: GOOGLE_PLACES_API_KEY
@@ -12,6 +14,20 @@ services:
       - key: APIFY_API_KEY
         sync: false
       - key: FOURSQUARE_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: BUSINESS_CLAIM_PRICE_ID
+        sync: false
+      - key: BUSINESS_JWT_SECRET
+        sync: false
+      - key: SUBSCRIBER_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: OWNER_TEXT_WEBHOOK_SECRET
         sync: false
       - key: DATABASE_URL
         fromDatabase:
