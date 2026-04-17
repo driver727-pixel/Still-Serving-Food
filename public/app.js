@@ -233,7 +233,7 @@ function renderVenues(venues) {
   const adsBottom = document.getElementById('results-ads-bottom');
 
   if (!venues.length) {
-    venueList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:2rem">No venues match the selected filter.</p>';
+    venueList.innerHTML = '<p class="empty-results">No venues match the selected filter.</p>';
     // Hide ads when there are no results (low-value / empty content screen)
     if (adsTop) adsTop.classList.add('hidden');
     if (adsBottom) adsBottom.classList.add('hidden');
@@ -419,8 +419,8 @@ function buildUserReportWidget(venue) {
   return `
     <div class="venue-feedback" data-venue-name="${escapeHtml(venue.name || '')}" data-venue-url="${escapeHtml(venue.url || '')}" data-storage-key="${escapeHtml(storageKey)}">
       <span class="venue-feedback-label">Still taking orders?</span>
-      <button class="feedback-btn feedback-yes" type="button" aria-label="Yes, still taking orders">👍 Yes</button>
-      <button class="feedback-btn feedback-no"  type="button" aria-label="No, kitchen is closed">👎 No</button>
+      <button class="feedback-btn feedback-yes" type="button" aria-label="Yes, still taking orders" data-sound="blip">👍 Yes</button>
+      <button class="feedback-btn feedback-no"  type="button" aria-label="No, kitchen is closed" data-sound="blip">👎 No</button>
       ${summary}
     </div>`;
 }
@@ -518,11 +518,13 @@ function showLoading(show) {
 
 function showResults(show) {
   resultsSection.classList.toggle('hidden', !show);
+  resultsSection.classList.toggle('is-dispensed', show);
   if (show) initAds();
 }
 
 function hideResults() {
   resultsSection.classList.add('hidden');
+  resultsSection.classList.remove('is-dispensed');
 }
 
 function showError(msg) {

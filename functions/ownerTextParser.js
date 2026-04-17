@@ -8,6 +8,8 @@ const TIME_TOKEN_RE = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/;
 function normalizePhone(phone) {
   if (typeof phone !== 'string') return null;
   const digits = phone.replace(/\D/g, '');
+  // 10-digit US number — Twilio delivers these as E.164 with +1 prefix
+  if (digits.length === 10) return `+1${digits}`;
   if (digits.length < 10 || digits.length > 15) return null;
   return `+${digits}`;
 }
